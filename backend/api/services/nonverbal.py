@@ -141,7 +141,14 @@ class FaceAnalyzer(Analyzer):
             "eyeBlinkLeft": {"sum": 0.0, "peak": 0.0, "active": 0.0},
             "eyeBlinkRight": {"sum": 0.0, "peak": 0.0, "active": 0.0},
         }
-        self.active_threshold = 0.5
+        # Per-metric activity thresholds tuned to typical ranges
+        # You can adjust these if needed
+        self.thresholds = {
+            "smile": 0.01,         # smiles can be subtle on blendshapes
+            "jawOpen": 0.20,       # talking often ~0.2-0.4
+            "eyeBlinkLeft": 0.20,  # blinks are brief; keep threshold modest
+            "eyeBlinkRight": 0.20,
+        }
 
     def start(self, video_props: Dict[str, Any]) -> None:
         # Compute per-sample time delta (seconds)
@@ -167,7 +174,8 @@ class FaceAnalyzer(Analyzer):
         m = self.metrics[name]
         m["sum"] += float(score) * self.dt_s
         m["peak"] = max(m["peak"], float(score))
-        if score >= self.active_threshold:
+        thr = float(self.thresholds.get(name, 0.2))
+        if score >= thr:
             m["active"] += self.dt_s
 
     def process(self, frame_rgb, frame_index: int, timestamp_ms: int) -> Optional[Dict[str, Any]]:

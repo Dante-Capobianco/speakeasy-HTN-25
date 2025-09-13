@@ -14,9 +14,8 @@ server.use(cors(corsOptions));
 server.options("/", cors(corsOptions));
 
 server.get(Path.GET_USER, async (req, res, next) => {
-  // Test code
-  const users = await User.findAllUsers();
-  res.status(200).json({ users });
+  const user = await User.findUserById(parseInt(req.query?.id));
+  res.status(200).json({ user });
 });
 
 server.use("/", async (req, res, next) => {

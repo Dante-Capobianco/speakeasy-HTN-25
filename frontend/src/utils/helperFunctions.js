@@ -42,10 +42,14 @@ export const uploadVideoAndGetLink = async (videoObject) => {
   };
 };
 
-const getUser = async () => {
+const addUser = async (topics) => {
+
+}
+
+export const getUser = async (userId) => {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_BASE_URL}${Path.GET_USER}`,
+      `${import.meta.env.VITE_BASE_URL}${Path.GET_USER}?id=${userId}`,
       {
         method: "GET",
         headers: {
@@ -55,8 +59,8 @@ const getUser = async () => {
     );
 
     if (response.ok) {
-      const users = await response.json();
-      return users.users;
+      const userObject = await response.json();
+      return userObject.user;
     } else {
       return null;
     }

@@ -22,6 +22,10 @@ MODEL_LOCAL = os.path.join(os.path.dirname(__file__), "hand_landmarker.task")
 FACE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
 FACE_MODEL_LOCAL = os.path.join(os.path.dirname(__file__), "face_landmarker.task")
 
+# Pose Landmarker model (full)
+POSE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task"
+POSE_MODEL_LOCAL = os.path.join(os.path.dirname(__file__), "pose_landmarker_full.task")
+
 
 # -------- Request schema --------
 class NonverbalRequest(BaseModel):
@@ -238,6 +242,46 @@ class FaceAnalyzer(Analyzer):
         }
 
 
+# -------- Pose analyzer (MediaPipe Tasks) --------
+class PoseAnalyzer(Analyzer):
+    name: str = "pose"
+
+    def __init__(self) -> None:
+        self.detector = None
+
+    def start(self, video_props: Dict[str, Any]) -> None:
+        model_path = ensure_model_from(POSE_MODEL_URL, POSE_MODEL_LOCAL)
+        base_options = mp_python.BaseOptions(model_asset_path=model_path)
+        options = mp_vision.PoseLandmarkerOptions(
+            base_options=base_options,
+            running_mode=mp_vision.RunningMode.VIDEO,
+            output_segmentation_masks=False,
+            min_pose_detection_confidence=0.5,
+            min_pose_presence_confidence=0.5,
+            min_tracking_confidence=0.5,
+        )
+        self.detector = mp_vision.PoseLandmarker.create_from_options(options)
+
+    def process(self, frame_rgb, frame_index: int, timestamp_ms: int) -> Optional[Dict[str, Any]]:
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+        res = self.detector.detect_for_video(mp_image, timestamp_ms)
+
+        out = {"landmarks": []}
+        if res and getattr(res, "pose_landmarks", None):
+            # Use the first detected pose
+            if len(res.pose_landmarks) > 0:
+                pts = [
+                    {"x": float(p.x), "y": float(p.y), "z": float(p.z)}
+                    for p in res.pose_landmarks[0]
+                ]
+                out["landmarks"] = pts
+
+        return {"pose": out}
+
+    def finalize(self) -> Dict[str, Any]:
+        return {}
+
+
 # -------- Pipeline (decode once, fan out to modules) --------
 def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int], modules: List[str]) -> Dict[str, Any]:
     cap = cv2.VideoCapture(local_video_path)
@@ -255,6 +299,8 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
             analyzers[m] = HandsAnalyzer()
         elif m == "face":
             analyzers[m] = FaceAnalyzer()
+        elif m == "pose":
+            analyzers[m] = PoseAnalyzer()
         else:
             unsupported.append(m)
 

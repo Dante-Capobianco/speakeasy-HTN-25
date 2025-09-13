@@ -153,6 +153,9 @@ class FaceAnalyzer(Analyzer):
             "eyeBlinkLeft": 0.20,  # blinks are brief; keep threshold modest
             "eyeBlinkRight": 0.20,
         }
+        # Blink event detection state (combined both eyes)
+        self.blink_count = 0
+        self._blink_active = False
 
     def start(self, video_props: Dict[str, Any]) -> None:
         # Compute per-sample time delta (seconds)
@@ -214,6 +217,16 @@ class FaceAnalyzer(Analyzer):
             blink_l = cat_scores.get("eyeBlinkLeft", 0.0)
             blink_r = cat_scores.get("eyeBlinkRight", 0.0)
 
+        # Blink event detection using combined blink intensity (either eye)
+        combined_blink = max(blink_l, blink_r)
+        blink_thr = float(self.thresholds.get("eyeBlinkLeft", 0.20))
+        if combined_blink >= blink_thr:
+            if not self._blink_active:
+                self._blink_active = True
+                self.blink_count += 1
+        else:
+            self._blink_active = False
+
         # Accumulate for all sampled frames (treat no-detection as 0)
         self._accumulate("smile", smile)
         self._accumulate("jawOpen", jaw_open)
@@ -239,6 +252,7 @@ class FaceAnalyzer(Analyzer):
             "jawOpen": pack("jawOpen"),
             "eyeBlinkLeft": pack("eyeBlinkLeft"),
             "eyeBlinkRight": pack("eyeBlinkRight"),
+            "blinkCount": int(self.blink_count),
         }
 
 

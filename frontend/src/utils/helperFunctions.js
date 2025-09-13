@@ -26,12 +26,9 @@ export const uploadVideoAndGetLink = async (videoObject) => {
     try {
       const storageRef = ref(storage, "videos/" + videoFile[0].name);
       let videoUrl = null;
-      console.log(videoUrl);
       await uploadBytes(storageRef, reader.result).then(async (snapshot) => {
-        console.log("hit");
         await getDownloadURL(snapshot.ref).then((downloadURL) => {
           videoUrl = downloadURL;
-          console.log(downloadURL);
         });
       });
 
@@ -42,9 +39,29 @@ export const uploadVideoAndGetLink = async (videoObject) => {
   };
 };
 
-const addUser = async (topics) => {
+export const addUser = async (topics) => {
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_BASE_URL}${Path.ADD_USER}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ topics }),
+      }
+    );
 
-}
+    if (response.ok) {
+      const userIdObject = await response.json();
+      return userIdObject.userId;
+    } else {
+      return null;
+    }
+  } catch (error) {
+    return null;
+  }
+};
 
 export const getUser = async (userId) => {
   try {

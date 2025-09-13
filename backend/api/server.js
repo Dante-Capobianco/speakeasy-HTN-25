@@ -14,8 +14,13 @@ server.use(cors(corsOptions));
 server.options("/", cors(corsOptions));
 
 server.get(Path.GET_USER, async (req, res, next) => {
-  const user = await User.findUserById(parseInt(req.query?.id));
+  const user = await User.findUserById(parseInt(req?.query?.id));
   res.status(200).json({ user });
+});
+
+server.post(Path.ADD_USER, async (req, res, next) => {
+  const userId = await User.addUser(req?.body?.topics);
+  res.status(200).json({ userId });
 });
 
 server.use("/", async (req, res, next) => {

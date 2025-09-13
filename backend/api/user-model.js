@@ -9,4 +9,14 @@ module.exports = {
       },
     });
   },
+
+  async addUser(topics) {
+    const newUser = await prisma.user.create({
+      data: {
+        topics,
+      },
+    });
+
+    return newUser.id;
+  },
 };

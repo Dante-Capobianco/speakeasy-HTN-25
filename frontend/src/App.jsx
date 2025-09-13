@@ -1,7 +1,7 @@
 import "./App.css";
 import { uploadVideoAndGetLink } from "./utils/helperFunctions";
 import { useState } from "react";
-import { getUser } from "./utils/helperFunctions";
+import { getUser, addUser } from "./utils/helperFunctions";
 
 function App() {
   const [videoUrl, setVideoUrl] = useState(null);
@@ -13,6 +13,7 @@ function App() {
         across entire website; app.css for page-specific styling
       </div>
       <button onClick={() => getUser(1)}>get User</button>
+      <button onClick={() => addUser(["Communication, Leadership"])}>Add User</button>
       <input
         type="file"
         id="practice-video"

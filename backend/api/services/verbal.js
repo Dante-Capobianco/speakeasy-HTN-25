@@ -2,7 +2,7 @@ const fs = require("fs");
 require('dotenv').config();
 const OpenAI = require("openai");
 
-const openai = new OpenAI(); // 自动读取 OPENAI_API_KEY
+const openai = new OpenAI(); 
 
 
 /**

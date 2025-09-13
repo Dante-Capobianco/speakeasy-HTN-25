@@ -123,6 +123,78 @@ def label_intensity(x: float) -> str:
     return label_by_edges(x, [0.05, 0.15, 0.30])
 
 
+def label_blink_count(x: float) -> str:
+    """Blink-specific qualitative labels with higher thresholds.
+    Edges tuned to be more forgiving; only very high blink counts map to 'very much'.
+    Bins: (0,10) little, [10,25) medium, [25,70) relatively many, >=70 very much
+    """
+    return label_by_edges(x, [10.0, 25.0, 70.0])
+
+
+# -------- Scoring helpers (0-100) --------
+def _clamp(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+def score_linear(x: float, lo: float, hi: float, min_score: int = 20, max_score: int = 95) -> int:
+    """Increasing score: lo -> min_score, hi -> max_score."""
+    try:
+        x = float(x)
+    except Exception:
+        return min_score
+    if hi == lo:
+        return int((min_score + max_score) / 2)
+    t = _clamp((x - lo) / (hi - lo), 0.0, 1.0)
+    return int(round(min_score + t * (max_score - min_score)))
+
+def score_inverse(x: float, lo: float, hi: float, min_score: int = 20, max_score: int = 95) -> int:
+    """Decreasing score: x <= lo -> max_score, x >= hi -> min_score."""
+    try:
+        x = float(x)
+    except Exception:
+        return min_score
+    if hi == lo:
+        return int((min_score + max_score) / 2)
+    t = _clamp((x - lo) / (hi - lo), 0.0, 1.0)
+    return int(round(max_score - t * (max_score - min_score)))
+
+def score_triangular(x: float, low: float, mid: float, high: float, min_score: int = 20, max_score: int = 95) -> int:
+    """Peak at mid; declines linearly toward low/high; outside gives min_score."""
+    try:
+        x = float(x)
+    except Exception:
+        return min_score
+    if x <= low or x >= high:
+        return min_score
+    if x == mid:
+        return max_score
+    if x < mid:
+        t = (x - low) / max(1e-9, (mid - low))
+    else:
+        t = (high - x) / max(1e-9, (high - mid))
+    t = _clamp(t, 0.0, 1.0)
+    return int(round(min_score + t * (max_score - min_score)))
+
+
+# -------- Score post-processing: lift low scores --------
+def lift_low_score(score: int) -> int:
+    """Map scores below 60 into [50, 60) while keeping >=60 unchanged.
+
+    Examples:
+    - 30 -> ~55
+    - 20 -> ~53
+    - 0  -> 50
+    - 69, 73, 91 stay the same.
+    """
+    try:
+        s = float(score)
+    except Exception:
+        return 50
+    if s >= 60.0:
+        return int(round(s))
+    s = max(0.0, s)
+    return int(round(50.0 + (s * (10.0 / 60.0))))
+
+
 # -------- Analyzer interface --------
 class Analyzer:
     name: str = "base"
@@ -307,7 +379,22 @@ class FaceAnalyzer(Analyzer):
         feedback = {
             "smile_feedback": f"Smiling intensity: {label_ratio(smile['avg'])}",
             "speech_mouth_open_feedback": f"Speaking activity: {label_ratio(jaw['active_duration_s'] / max(self.total_time_s, 1e-9))}",
-            "blinking_feedback": f"Blinking frequency: {label_count(blink_count)}",
+            "blinking_feedback": f"Blinking frequency: {label_blink_count(blink_count)}",
+        }
+
+        # Scoring (0-100; ~70 as typical)
+        speaking_ratio = jaw['active_duration_s'] / max(self.total_time_s, 1e-9)
+        # Smile: increasing with avg (typical ~0.02 => ~70)
+        smile_score = score_linear(smile['avg'], lo=0.0, hi=0.05)
+        # Speaking: increasing with ratio (typical ~0.15 => ~70)
+        speaking_score = score_linear(speaking_ratio, lo=0.05, hi=0.30)
+        # Blinking: be more forgiving; only very high blink counts should score low.
+        # Use an inverse curve: <= ~25 stays high, drops gradually towards ~70+ blinks.
+        blink_score = score_inverse(blink_count, lo=25, hi=70)
+        scores = {
+            "smile_score": lift_low_score(smile_score),
+            "speaking_score": lift_low_score(speaking_score),
+            "blinking_score": lift_low_score(blink_score),
         }
 
         return {
@@ -317,6 +404,7 @@ class FaceAnalyzer(Analyzer):
             "eyeBlinkRight": ebr,
             "blinkCount": blink_count,
             "feedback": feedback,
+            "scores": scores,
         }
 
 
@@ -489,12 +577,28 @@ class PoseAnalyzer(Analyzer):
             "motion_feedback": f"Movement intensity is {motion_level}.",
             "space_feedback": f"Framing/body space usage is {space_level}.",
         }
+        # Scoring
+        # Posture: higher avg tilt_deg means closer to horizontal shoulder line => more upright in our current coding
+        posture_score = score_linear(posture["tilt_deg_avg"], lo=150.0, hi=178.0)
+        # Stability: higher stillness better up to 0.95; then plateau
+        stability_score = score_linear(stability["stillness_ratio"], lo=0.6, hi=0.95)
+        # Motion: best around moderate intensity (triangular)
+        motion_score = score_triangular(motion["movement_intensity_avg"], low=0.0, mid=0.12, high=0.35)
+        # Space: moderate bbox area preferred (triangular)
+        space_score = score_triangular(space_use["bbox_area_avg"], low=0.10, mid=0.30, high=0.60)
+        scores = {
+            "posture_score": lift_low_score(posture_score),
+            "stability_score": lift_low_score(stability_score),
+            "motion_score": lift_low_score(motion_score),
+            "space_score": lift_low_score(space_score),
+        }
         return {
             "posture": posture,
             "stability": stability,
             "space_use": space_use,
             "motion": motion,
             "feedback": feedback,
+            "scores": scores,
         }
 
 
@@ -605,11 +709,27 @@ class GestureAnalyzer(Analyzer):
             "hand_visibility_feedback": f"Hands visibility is {visibility_level}.",
             "dominant_hand_feedback": f"Dominant hand: {dominant}.",
         }
+        # Scores without selfTouch (added later in pipeline)
+        # Gesture frequency: moderate best (triangular)
+        gesture_freq_score = score_triangular(total_gesture_events, low=0, mid=8, high=25)
+        # Visibility: more visible hands up to ~0.7 is good
+        visibility_score = score_linear(hand_visibility["any_ratio"], lo=0.2, hi=0.7)
+        # Dominant hand score: combine visibility and existence of a dominant side
+        base = 60
+        dom_bonus = 8 if dominant != "none" else 0
+        vis_bonus = int(round(_clamp((hand_visibility["any_ratio"] - 0.2) / 0.5, 0.0, 1.0) * 12))
+        dominant_hand_score = int(_clamp(base + dom_bonus + vis_bonus, 0, 100))
+        scores = {
+            "gesture_frequency_score": lift_low_score(gesture_freq_score),
+            "hand_visibility_score": lift_low_score(visibility_score),
+            "dominant_hand_score": lift_low_score(dominant_hand_score),
+        }
         return {
             "gestureClasses": self.class_stats,
             "handVisibility": hand_visibility,
             "dominantHand": dominant,
             "feedback": feedback,
+            "scores": scores,
         }
 
 
@@ -735,6 +855,12 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
         # Attach into gesture summary if gesture analyzer present; else create a lightweight entry
         if "gesture" in summaries:
             summaries["gesture"]["selfTouch"] = self_touch
+            # Add selfTouch feedback and score (less is better)
+            st = self_touch
+            st_score = score_inverse(st.get("duration_s", 0.0), lo=0.0, hi=2.0)
+            st_level = label_ratio(min(1.0, st.get("duration_s", 0.0) / max(1e-9, (len(frames) * (dt_s))))).replace("very much", "very high").replace("relatively many", "high").replace("medium", "moderate")
+            summaries["gesture"].setdefault("feedback", {})["self_touch_feedback"] = f"Self-touch is {('low' if st_score>70 else 'moderate' if st_score>50 else 'high')}."
+            summaries["gesture"].setdefault("scores", {})["self_touch_score"] = lift_low_score(st_score)
         else:
             summaries["gesture"] = {"selfTouch": self_touch}
 

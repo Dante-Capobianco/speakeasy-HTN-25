@@ -24,14 +24,14 @@ module.exports = {
 
 
 // For test 
-if (require.main === module) {
-    const path = require("path");
-    const testAudio = path.join(__dirname, "../../../test/test(2).mp4");
-    analyzeVerbal(testAudio)
-        .then(text => {
-        console.log("Transcription result:", text);
-        })
-        .catch(err => {
-        console.error("Error:", err);
-        });
-}
+// if (require.main === module) {
+//     const path = require("path");
+//     const testAudio = path.join(__dirname, "../../../test/test(2).mp4");
+//     analyzeVerbal(testAudio)
+//         .then(text => {
+//         console.log("Transcription result:", text);
+//         })
+//         .catch(err => {
+//         console.error("Error:", err);
+//         });
+// }

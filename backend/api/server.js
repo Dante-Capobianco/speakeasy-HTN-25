@@ -3,6 +3,8 @@ const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const User = require("./user-model");
+const { PassThrough } = require("stream");
+const { analyzeVerbal } = require("./services/verbal");
 
 const server = express();
 server.use(helmet());
@@ -21,6 +23,30 @@ server.get(Path.GET_USER, async (req, res, next) => {
 server.post(Path.ADD_USER, async (req, res, next) => {
   const userId = await User.addUser(req?.body?.topics);
   res.status(200).json({ userId });
+});
+
+server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
+  const videoFile = await fetch(req?.body?.videoUrl);
+  if (!videoFile.ok) {
+    next({ status: 404, message: "Failed to fetch file" });
+    return;
+  }
+
+  // Convert response to a stream
+  // const buffer = await videoFile.arrayBuffer();
+  // const stream = new PassThrough();
+  // stream.end(Buffer.from(buffer));
+
+  try {
+    const transcription = await analyzeVerbal(testAudio);
+    console.log(transcription);
+  } catch (error) {
+    next(error);
+    return;
+  }
+
+  const analysis = null; // await User.addVideoAnalysis(null, parseInt(req?.query?.id));
+  res.status(200).json({ analysis });
 });
 
 server.use("/", async (req, res, next) => {

@@ -16,7 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
-export const uploadVideoAndGetLink = async (videoObject) => {
+export const processVideo = async (videoObject, question, userId) => {
   const videoFile = videoObject.files;
   if (!videoFile || videoFile.length === 0) return;
 
@@ -32,11 +32,37 @@ export const uploadVideoAndGetLink = async (videoObject) => {
         });
       });
 
-      return videoUrl;
+      if (!videoUrl) return null;
+
+      return await analyzeVideo(videoUrl, question, userId);
     } catch {
       return null;
     }
   };
+};
+
+const analyzeVideo = async (videoUrl, question, userId) => {
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_BASE_URL}${Path.ANALYZE_VIDEO}?id=${userId}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ videoUrl, question }),
+      }
+    );
+
+    if (response.ok) {
+      const analysisObject = await response.json();
+      return analysisObject.analysis;
+    } else {
+      return null;
+    }
+  } catch (error) {
+    return null;
+  }
 };
 
 export const addUser = async (topics) => {

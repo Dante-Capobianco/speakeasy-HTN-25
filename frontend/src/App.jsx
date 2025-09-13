@@ -1,10 +1,8 @@
 import "./App.css";
-import { uploadVideoAndGetLink } from "./utils/helperFunctions";
-import { useState } from "react";
+import { processVideo } from "./utils/helperFunctions";
 import { getUser, addUser } from "./utils/helperFunctions";
 
 function App() {
-  const [videoUrl, setVideoUrl] = useState(null);
 
   return (
     <>
@@ -18,7 +16,7 @@ function App() {
         type="file"
         id="practice-video"
         accept="video/*"
-        onChange={(e) => setVideoUrl(uploadVideoAndGetLink(e.target))}
+        onChange={(e) => processVideo(e.target, "Tell me a bit about yourself?", 1)}
       />
     </>
   );

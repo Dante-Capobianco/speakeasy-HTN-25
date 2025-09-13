@@ -18,6 +18,10 @@ app = FastAPI()
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 MODEL_LOCAL = os.path.join(os.path.dirname(__file__), "hand_landmarker.task")
 
+# Face Landmarker model (with blendshapes)
+FACE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+FACE_MODEL_LOCAL = os.path.join(os.path.dirname(__file__), "face_landmarker.task")
+
 
 # -------- Request schema --------
 class NonverbalRequest(BaseModel):
@@ -33,6 +37,18 @@ def ensure_model(path: str = MODEL_LOCAL) -> str:
         return path
     os.makedirs(os.path.dirname(path), exist_ok=True)
     r = requests.get(MODEL_URL, timeout=120)
+    r.raise_for_status()
+    with open(path, "wb") as f:
+        f.write(r.content)
+    return path
+
+
+def ensure_model_from(url: str, path: str) -> str:
+    """Download a model once and cache it locally."""
+    if os.path.exists(path):
+        return path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    r = requests.get(url, timeout=120)
     r.raise_for_status()
     with open(path, "wb") as f:
         f.write(r.content)
@@ -110,6 +126,110 @@ class HandsAnalyzer(Analyzer):
         return {}
 
 
+# -------- Face analyzer (MediaPipe Tasks) --------
+class FaceAnalyzer(Analyzer):
+    name: str = "face"
+
+    def __init__(self) -> None:
+        self.detector = None
+        # Time-weighted aggregation
+        self.dt_s = 0.0
+        self.total_time_s = 0.0
+        self.metrics = {
+            "smile": {"sum": 0.0, "peak": 0.0, "active": 0.0},
+            "jawOpen": {"sum": 0.0, "peak": 0.0, "active": 0.0},
+            "eyeBlinkLeft": {"sum": 0.0, "peak": 0.0, "active": 0.0},
+            "eyeBlinkRight": {"sum": 0.0, "peak": 0.0, "active": 0.0},
+        }
+        self.active_threshold = 0.5
+
+    def start(self, video_props: Dict[str, Any]) -> None:
+        # Compute per-sample time delta (seconds)
+        ms_per_frame = float(video_props.get("ms_per_frame", 33.3))
+        sample_n = int(video_props.get("sample_n", 1))
+        self.dt_s = (ms_per_frame * max(1, sample_n)) / 1000.0
+
+        model_path = ensure_model_from(FACE_MODEL_URL, FACE_MODEL_LOCAL)
+        base_options = mp_python.BaseOptions(model_asset_path=model_path)
+        options = mp_vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            running_mode=mp_vision.RunningMode.VIDEO,
+            output_face_blendshapes=True,
+            output_facial_transformation_matrixes=False,
+            num_faces=1,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5,
+            min_tracking_confidence=0.5,
+        )
+        self.detector = mp_vision.FaceLandmarker.create_from_options(options)
+
+    def _accumulate(self, name: str, score: float) -> None:
+        m = self.metrics[name]
+        m["sum"] += float(score) * self.dt_s
+        m["peak"] = max(m["peak"], float(score))
+        if score >= self.active_threshold:
+            m["active"] += self.dt_s
+
+    def process(self, frame_rgb, frame_index: int, timestamp_ms: int) -> Optional[Dict[str, Any]]:
+        # Convert to mp.Image
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+        res = self.detector.detect_for_video(mp_image, timestamp_ms)
+
+        # Default scores when no face detected in this sample
+        smile = 0.0
+        jaw_open = 0.0
+        blink_l = 0.0
+        blink_r = 0.0
+
+        if res and getattr(res, "face_blendshapes", None) and len(res.face_blendshapes) > 0:
+            # Build category->score map for the first face
+            cat_scores: Dict[str, float] = {}
+            for cat in res.face_blendshapes[0]:
+                cat_scores[cat.category_name] = float(cat.score)
+
+            # Smile: average of mouthSmileLeft/Right if available
+            smile_keys = [
+                cat_scores.get("mouthSmileLeft"),
+                cat_scores.get("mouthSmileRight"),
+            ]
+            smile_vals = [v for v in smile_keys if v is not None]
+            if len(smile_vals) == 2:
+                smile = (smile_vals[0] + smile_vals[1]) / 2.0
+            elif len(smile_vals) == 1:
+                smile = smile_vals[0]
+
+            jaw_open = cat_scores.get("jawOpen", 0.0)
+            blink_l = cat_scores.get("eyeBlinkLeft", 0.0)
+            blink_r = cat_scores.get("eyeBlinkRight", 0.0)
+
+        # Accumulate for all sampled frames (treat no-detection as 0)
+        self._accumulate("smile", smile)
+        self._accumulate("jawOpen", jaw_open)
+        self._accumulate("eyeBlinkLeft", blink_l)
+        self._accumulate("eyeBlinkRight", blink_r)
+        self.total_time_s += self.dt_s
+
+        # No per-frame payload needed for 'face'
+        return None
+
+    def finalize(self) -> Dict[str, Any]:
+        total = max(self.total_time_s, 1e-9)
+        def pack(name: str) -> Dict[str, float]:
+            m = self.metrics[name]
+            return {
+                "avg": m["sum"] / total,
+                "peak": m["peak"],
+                "active_duration_s": m["active"],
+            }
+
+        return {
+            "smile": pack("smile"),
+            "jawOpen": pack("jawOpen"),
+            "eyeBlinkLeft": pack("eyeBlinkLeft"),
+            "eyeBlinkRight": pack("eyeBlinkRight"),
+        }
+
+
 # -------- Pipeline (decode once, fan out to modules) --------
 def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int], modules: List[str]) -> Dict[str, Any]:
     cap = cv2.VideoCapture(local_video_path)
@@ -125,10 +245,12 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
     for m in modules:
         if m == "hands":
             analyzers[m] = HandsAnalyzer()
+        elif m == "face":
+            analyzers[m] = FaceAnalyzer()
         else:
             unsupported.append(m)
 
-    video_props = {"fps": float(fps), "ms_per_frame": ms_per_frame}
+    video_props = {"fps": float(fps), "ms_per_frame": ms_per_frame, "sample_n": sample_n}
     for a in analyzers.values():
         a.start(video_props)
 
@@ -200,7 +322,7 @@ async def analyze_nonverbal(req: NonverbalRequest):
         )
         return result
     finally:
-        # Cleanup temp file if downloaded
+        # Cleanup temp file if downloaded, if needed
         try:
             if os.path.dirname(local_video) == tempfile.gettempdir():
                 os.remove(local_video)

@@ -16,7 +16,7 @@ function App() {
         type="file"
         id="practice-video"
         accept="video/*"
-        onChange={(e) => processVideo(e.target, "Tell me a bit about yourself?", 1)}
+        onChange={(e) => processVideo(e.target, "Tell me a bit about yourself?", 1, ["Work Ethic, Leadership"])}
       />
     </>
   );

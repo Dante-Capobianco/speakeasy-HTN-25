@@ -78,14 +78,14 @@ async function analyzeVerbal(inputPathOrUrl, options = {}) {
 module.exports = { analyzeVerbal };
 
 // For test: node api/services/verbal.js
-if (require.main === module) {
-  const testAudio = path.join(__dirname, '../../../test/test(2).mp4'); // root test/test.mp4
-  analyzeVerbal(testAudio, { pollIntervalMs: 3000, disfluencies: true })
-    .then((res) => {
-      console.log('Transcript:\n', res.text);
-    })
-    .catch((err) => {
-      console.error('Error:', err.message);
-      if (err.details) console.error(err.details);
-    });
-}
+// if (require.main === module) {
+//   const testAudio = path.join(__dirname, '../../../test/test(2).mp4'); // root test/test.mp4
+//   analyzeVerbal(testAudio, { pollIntervalMs: 3000, disfluencies: true })
+//     .then((res) => {
+//       console.log('Transcript:\n', res.text);
+//     })
+//     .catch((err) => {
+//       console.error('Error:', err.message);
+//       if (err.details) console.error(err.details);
+//     });
+// }

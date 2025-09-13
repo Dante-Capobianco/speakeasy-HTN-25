@@ -16,32 +16,29 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
-export const processVideo = async (videoObject, question, userId) => {
+export const processVideo = async (videoObject, question, userId, topics) => {
   const videoFile = videoObject.files;
   if (!videoFile || videoFile.length === 0) return;
 
   const reader = new FileReader();
-  reader.readAsDataURL(videoFile[0]);
-  reader.onload = async () => {
-    try {
-      const storageRef = ref(storage, "videos/" + videoFile[0].name);
-      let videoUrl = null;
-      await uploadBytes(storageRef, reader.result).then(async (snapshot) => {
-        await getDownloadURL(snapshot.ref).then((downloadURL) => {
-          videoUrl = downloadURL;
-        });
+  try {
+    const storageRef = ref(storage, "videos/" + videoFile[0].name);
+    let videoUrl = null;
+    await uploadBytes(storageRef, videoFile[0]).then(async (snapshot) => {
+      await getDownloadURL(snapshot.ref).then((downloadURL) => {
+        videoUrl = downloadURL;
       });
+    });
 
-      if (!videoUrl) return null;
+    if (!videoUrl) return null;
 
-      return await analyzeVideo(videoUrl, question, userId);
-    } catch {
-      return null;
-    }
-  };
+    return await analyzeVideo(videoUrl, question, userId, topics);
+  } catch {
+    return null;
+  }
 };
 
-const analyzeVideo = async (videoUrl, question, userId) => {
+const analyzeVideo = async (videoUrl, question, userId, topics) => {
   try {
     const response = await fetch(
       `${import.meta.env.VITE_BASE_URL}${Path.ANALYZE_VIDEO}?id=${userId}`,
@@ -50,7 +47,7 @@ const analyzeVideo = async (videoUrl, question, userId) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ videoUrl, question }),
+        body: JSON.stringify({ videoUrl, question, topics }),
       }
     );
 

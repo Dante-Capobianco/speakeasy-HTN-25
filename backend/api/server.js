@@ -37,13 +37,26 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
   // const stream = new PassThrough();
   // stream.end(Buffer.from(buffer));
 
-  try {
-    const transcription = await analyzeVerbal(testAudio);
-    console.log(transcription);
-  } catch (error) {
-    next(error);
-    return;
-  }
+  // VERBAL ANALYSIS
+  // try {
+  //   const transcription = await analyzeVerbal(testAudio);
+  //   console.log(transcription);
+  // } catch (error) {
+  //   next(error);
+  //   return;
+  // }
+
+  // NON-VERBAL ANALYSIS
+  const nonverbalResponse = await fetch(
+    `http://127.0.0.1:8000/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ videoUrl: req?.body?.videoUrl }),
+    }
+  );
 
   const analysis = null; // await User.addVideoAnalysis(null, parseInt(req?.query?.id));
   res.status(200).json({ analysis });

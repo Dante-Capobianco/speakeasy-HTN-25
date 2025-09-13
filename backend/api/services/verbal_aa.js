@@ -53,7 +53,7 @@ async function analyzeVerbal(inputPathOrUrl, options = {}) {
 
   const start = Date.now();
   const pollInterval = options.pollIntervalMs || 3000;
-  const timeout = options.timeoutMs || 10 * 60 * 1000; // 10 分钟超时
+  const timeout = options.timeoutMs || 5 * 60 * 1000; // exceed limit: 5min, we can change later
 
   // Polling to end
   while (true) {

@@ -187,6 +187,44 @@ def score_triangular(x: float, low: float, mid: float, high: float, min_score: i
     return int(round(min_score + t * (max_score - min_score)))
 
 
+def score_trapezoid(
+    x: float,
+    low: float,
+    plateau_lo: float,
+    plateau_hi: float,
+    high: float,
+    min_score: int = 20,
+    max_score: int = 95,
+) -> int:
+    """Plateau-shaped score with a flat optimal region [plateau_lo, plateau_hi].
+
+    - x <= low or x >= high -> min_score
+    - low < x < plateau_lo: linearly rises from min_score to max_score
+    - plateau_lo <= x <= plateau_hi: max_score
+    - plateau_hi < x < high: linearly falls from max_score to min_score
+    """
+    try:
+        x = float(x)
+    except Exception:
+        return min_score
+    # Guard invalid configuration
+    if not (low <= plateau_lo <= plateau_hi <= high) or (low == high):
+        return int((min_score + max_score) / 2)
+
+    if x <= low or x >= high:
+        return min_score
+    if plateau_lo <= x <= plateau_hi:
+        return max_score
+    if x < plateau_lo:
+        t = (x - low) / max(1e-9, (plateau_lo - low))
+        t = _clamp(t, 0.0, 1.0)
+        return int(round(min_score + t * (max_score - min_score)))
+    # x > plateau_hi
+    t = (high - x) / max(1e-9, (high - plateau_hi))
+    t = _clamp(t, 0.0, 1.0)
+    return int(round(min_score + t * (max_score - min_score)))
+
+
 # -------- Score post-processing: lift low scores --------
 def lift_low_score(score: int) -> int:
     """Map scores below 60 into [50, 60) while keeping >=60 unchanged.
@@ -396,8 +434,9 @@ class FaceAnalyzer(Analyzer):
 
         # Scoring (0-100; ~70 as typical)
         speaking_ratio = jaw['active_duration_s'] / max(self.total_time_s, 1e-9)
-        # Smile: increasing with avg (typical ~0.02 => ~70)
-        smile_score = score_linear(smile['avg'], lo=0.0, hi=0.05)
+        # Smile: moderate smiles are best; very low or very high intensity scores lower
+        # Plateau roughly between ~0.015 and ~0.05 (blendshape average), then gently decreases
+        smile_score = score_trapezoid(smile['avg'], low=0.0, plateau_lo=0.015, plateau_hi=0.05, high=0.20)
         # Speaking: increasing with ratio (typical ~0.15 => ~70)
         speaking_score = score_linear(speaking_ratio, lo=0.05, hi=0.30)
         # Blinking: be more forgiving; only very high blink counts should score low.
@@ -540,8 +579,8 @@ class PoseAnalyzer(Analyzer):
 
         # always track total time (sampled)
         self.total_time_s += self.dt_s
-
-        return {"pose": out}
+        # Return pose data directly (no extra nesting) so downstream code can access keys like 'landmarks'
+        return out
 
     def finalize(self) -> Dict[str, Any]:
         total = max(self.total_time_s, 1e-9)
@@ -596,8 +635,9 @@ class PoseAnalyzer(Analyzer):
         stability_score = score_linear(stability["stillness_ratio"], lo=0.6, hi=0.95)
         # Motion: best around moderate intensity (triangular)
         motion_score = score_triangular(motion["movement_intensity_avg"], low=0.0, mid=0.12, high=0.35)
-        # Space: moderate bbox area preferred (triangular)
-        space_score = score_triangular(space_use["bbox_area_avg"], low=0.10, mid=0.30, high=0.60)
+        # Space: prefer a plateau of average bbox area between ~30% and ~50% of frame
+        # Below ~10% or above ~70% is poor; 10%-30% ramps up; 50%-70% ramps down
+        space_score = score_trapezoid(space_use["bbox_area_avg"], low=0.10, plateau_lo=0.30, plateau_hi=0.50, high=0.70)
         scores = {
             "posture_score": lift_low_score(posture_score),
             "stability_score": lift_low_score(stability_score),
@@ -826,14 +866,37 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
                 continue
             lm = pose["landmarks"]
             try:
-                nose = lm[0]; lw = lm[15]; rw = lm[16]
-                # normalized 2D distance to nearest wrist
-                d_l = math.hypot(lw["x"] - nose["x"], lw["y"] - nose["y"]) if lw else 1e9
-                d_r = math.hypot(rw["x"] - nose["x"], rw["y"] - nose["y"]) if rw else 1e9
+                # Consider multiple face-adjacent points (MP Pose indices):
+                # nose(0), eyes(1-6), ears(7-8), mouth corners(9-10)
+                face_idxs = [0,1,2,3,4,5,6,7,8,9,10]
+                face_pts = []
+                for idx in face_idxs:
+                    try:
+                        p = lm[idx]
+                        if p is not None:
+                            face_pts.append((float(p["x"]), float(p["y"])) )
+                    except Exception:
+                        continue
+                # Wrist points
+                lw = lm[15] if len(lm) > 15 else None
+                rw = lm[16] if len(lm) > 16 else None
+                def min_dist_to_face(wrist):
+                    if wrist is None or not face_pts:
+                        return 1e9
+                    wx, wy = float(wrist.get("x", 1e9)), float(wrist.get("y", 1e9))
+                    md = 1e9
+                    for fx, fy in face_pts:
+                        d = math.hypot(wx - fx, wy - fy)
+                        if d < md:
+                            md = d
+                    return md
+                d_l = min_dist_to_face(lw)
+                d_r = min_dist_to_face(rw)
                 d = min(d_l, d_r)
             except Exception:
                 d = 1e9
-            threshold = 0.08
+            # Threshold tuned for normalized image coords; raised to better catch forehead touches
+            threshold = 0.15
             if d <= threshold:
                 if not active:
                     active = True
@@ -869,7 +932,7 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
     # - eye_movements_score (from face.blinking_score)
     # - pausing_score (from face.speaking_score)
     # - posture_score (average of pose.stability_score and pose.posture_score)
-    # - hand_gesture_score (average of gesture.hand_visibility_score and gesture.self_touch_score)
+    # - hand_gesture_score (weighted: (hand_visibility_score + 2*self_touch_score) / 3)
     # - spatial_distribution_score (from pose.space_score)
     aggregated_scores: Dict[str, int] = {}
 
@@ -912,7 +975,8 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
     gest_vis = _get_score("gesture", "hand_visibility_score")
     gest_self_touch = _get_score("gesture", "self_touch_score")
     if gest_vis is not None and gest_self_touch is not None:
-        aggregated_scores["hand_gesture_score"] = int(round((gest_vis + gest_self_touch) / 2))
+        # Weighted: self_touch has double weight compared to visibility
+        aggregated_scores["hand_gesture_score"] = int(round((gest_vis + 2 * gest_self_touch) / 3))
 
     # -------- Build data-driven descriptions (positives & negatives) from 9 standards --------
     # Collect the original nine standards (when available)
@@ -945,6 +1009,24 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
         standard_scores["hand_visibility"] = gest_vis
     if gest_self_touch is not None:
         standard_scores["self_touch"] = gest_self_touch
+
+    # ---- Debug print: nine original standards (not returned) ----
+    try:
+        all_keys = [
+            "smile",
+            "speaking",
+            "blinking",
+            "posture",
+            "stability",
+            "motion",
+            "space",
+            "hand_visibility",
+            "self_touch",
+        ]
+        debug_payload = {k: standard_scores.get(k, "N/A") for k in all_keys}
+        print("[nonverbal] Nine standard scores:", json.dumps(debug_payload, ensure_ascii=False))
+    except Exception as e:
+        print("[nonverbal] Failed to print nine standard scores:", e)
 
     # Description templates: 4 positives and 4 negatives per standard
     POS_DESC: Dict[str, List[str]] = {
@@ -1060,6 +1142,58 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
         ],
     }
 
+    # Direction-aware negative templates for selected standards
+    NEG_DESC_DIR: Dict[str, Dict[str, List[str]]] = {
+        "smile": {
+            # Too little smiling
+            "low": [
+                "Expression looks flat; add brief, natural smiles.",
+                "Limited smiling reduces approachability; show a touch more warmth.",
+                "Facial affect feels restrained; sprinkle in light smiles.",
+                "A few natural smiles would help you connect.",
+            ],
+            # Too much smiling
+            "high": [
+                "Smiling appears exaggerated at times; ease it slightly.",
+                "Strong smiles can feel constant; relax the intensity a bit.",
+                "Frequent or large smiles may distract from the message; soften occasionally.",
+                "Dial back the smile intensity to keep it natural.",
+            ],
+        },
+        "motion": {
+            # Movement too low
+            "low": [
+                "Movement is minimal; add a few purposeful gestures.",
+                "Gestures are sparse; introduce moderate motion for emphasis.",
+                "Very low movement can read as flat; animate key points lightly.",
+                "Consider a touch more expressive motion to engage.",
+            ],
+            # Movement too high
+            "high": [
+                "Excessive movement distracts; reduce intensity and hold beats.",
+                "Gestures run high; simplify and pause to highlight ideas.",
+                "Rapid motion competes with content; slow down and ground gestures.",
+                "Calm the overall movement for clearer delivery.",
+            ],
+        },
+        "space": {
+            # Framing too tight (too little space)
+            "low": [
+                "Framing is too tight; step back or widen the crop.",
+                "Body occupies too little frame space; increase distance slightly.",
+                "Composition feels cramped; add margin around shoulders and hands.",
+                "Widen the view to reach a comfortable 30–50% frame use.",
+            ],
+            # Framing too loose (too much space)
+            "high": [
+                "Framing is too loose; move closer or crop tighter.",
+                "Presence gets small in frame; reduce empty space.",
+                "Wide composition dilutes impact; tighten to center focus.",
+                "Aim for a balanced 30–50% frame use for presence.",
+            ],
+        },
+    }
+
     positive_texts: List[str] = []
     negative_texts: List[str] = []
     items = list(standard_scores.items())  # List[(key, score)]
@@ -1087,13 +1221,52 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
             take = min(2, len(bottom_sorted))
             neg_selected = [k for k, _ in bottom_sorted[:take]]
 
+        # Determine direction (low/high) for selected directional standards using raw metrics
+        dir_map: Dict[str, Optional[str]] = {}
+        try:
+            # Smile direction from face analyzer average
+            face_summary = summaries.get("face", {}) if isinstance(summaries.get("face", {}), dict) else {}
+            smile_dict = face_summary.get("smile") if isinstance(face_summary.get("smile"), dict) else None
+            if smile_dict:
+                s_avg = float(smile_dict.get("avg", 0.0))
+                if s_avg < 0.015:
+                    dir_map["smile"] = "low"
+                elif s_avg > 0.05:
+                    dir_map["smile"] = "high"
+
+            # Motion direction from pose analyzer movement_intensity_avg (mid ~0.12)
+            pose_summary = summaries.get("pose", {}) if isinstance(summaries.get("pose", {}), dict) else {}
+            motion_dict = pose_summary.get("motion") if isinstance(pose_summary.get("motion"), dict) else None
+            if motion_dict:
+                m_avg = float(motion_dict.get("movement_intensity_avg", 0.0))
+                dir_map["motion"] = "low" if m_avg < 0.12 else "high"
+
+            # Space direction from pose analyzer bbox_area_avg with plateau 0.30–0.50
+            space_dict = pose_summary.get("space_use") if isinstance(pose_summary.get("space_use"), dict) else None
+            if space_dict:
+                a_avg = float(space_dict.get("bbox_area_avg", 0.0))
+                if a_avg < 0.30:
+                    dir_map["space"] = "low"
+                elif a_avg > 0.50:
+                    dir_map["space"] = "high"
+        except Exception:
+            pass
+
         # Map selections to one randomized sentence each
         for key in pos_selected:
             opts = POS_DESC.get(key, [])
             if opts:
                 positive_texts.append(random.choice(opts))
         for key in neg_selected:
-            opts = NEG_DESC.get(key, [])
+            opts: List[str] = []
+            # Use direction-aware negatives for selected standards when direction is known
+            if key in NEG_DESC_DIR:
+                direction = dir_map.get(key)
+                if direction:
+                    opts = NEG_DESC_DIR[key].get(direction, [])
+            # Fallback to generic negatives if no direction or not directional
+            if not opts:
+                opts = NEG_DESC.get(key, [])
             if opts:
                 negative_texts.append(random.choice(opts))
 

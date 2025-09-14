@@ -9,8 +9,11 @@ const { verbalPrompt, questionPrompt } = require("./services/promptVerbal");
 const { negativeFeedbackKeywords } = require("../constants");
 
 const server = express();
+
+// Middleware
 server.use(helmet());
 server.use(express.json());
+
 const corsOptions = {
   origin: process.env.FRONTEND_URL,
 };
@@ -453,9 +456,10 @@ server.use("/", async (req, res, next) => {
   next({ status: 404, message: "Endpoint not found" });
 });
 
+// Error handler
 server.use((err, req, res, next) => {
   const { message, status = 500 } = err;
   res.status(status).json({ message });
 });
 
-module.exports = server;
+export default server;

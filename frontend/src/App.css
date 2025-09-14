@@ -1,9 +1,12 @@
+Js (lol):
+
 /* Reset and base styles */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
+
 
 body,
 html,
@@ -16,10 +19,12 @@ html,
   overflow-x: hidden;
 }
 
+
 #root {
   display: flex;
   flex-direction: column;
 }
+
 
 /* Common page styles */
 .landing-page,
@@ -43,6 +48,7 @@ html,
   overflow-x: hidden;
 }
 
+
 .practice-complete-page {
   min-height: 100vh;
   width: 100vw;
@@ -57,6 +63,7 @@ html,
   overflow-y: auto;
 }
 
+
 /* Header */
 .header {
   position: absolute;
@@ -64,6 +71,7 @@ html,
   left: 1rem;
   z-index: 50;
 }
+
 
 .header-button {
   background: none;
@@ -75,9 +83,11 @@ html,
   transition: color 0.3s;
 }
 
+
 .header-button:hover {
   color: #ffc0cb;
 }
+
 
 /* Landing page */
 .landing-title {
@@ -87,22 +97,27 @@ html,
   margin-bottom: 2rem;
 }
 
+
 .cursor {
   animation: blink 1s infinite;
 }
 
+
 @keyframes blink {
+
 
   0%,
   50% {
     opacity: 1;
   }
 
+
   51%,
   100% {
     opacity: 0;
   }
 }
+
 
 /* Common button styles */
 .continue-button,
@@ -119,15 +134,38 @@ html,
   margin-top: 2rem;
 }
 
+
 .continue-button:hover,
 .get-started-button:hover {
   border-color: #ffc0cb;
 }
 
+
 .continue-button.disabled {
   color: #999;
   cursor: not-allowed;
 }
+
+
+/* I'm Ready button styling */
+.ready-button {
+  background-color: white;
+  color: black;
+  border: 2px solid transparent;
+  border-radius: 50px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 2rem;
+}
+
+
+.ready-button:hover {
+  border-color: #ffc0cb;
+}
+
 
 /* Topics page */
 .topics-title,
@@ -138,6 +176,7 @@ html,
   text-align: center;
 }
 
+
 .topics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -145,6 +184,7 @@ html,
   margin-bottom: 4rem;
   max-width: 800px;
 }
+
 
 .topic-button {
   width: 200px;
@@ -163,17 +203,20 @@ html,
   padding: 1rem;
 }
 
+
 .topic-button:hover {
   color: blue;
   border-color: #ffc0cb;
 }
+
 
 .topic-button.selected {
   border-color: blue;
   border-width: 4px;
 }
 
-/* Summary page */
+
+/* Summary page - Increased font sizes */
 .steps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -182,25 +225,42 @@ html,
   max-width: 1000px;
 }
 
+
 .step-item {
   text-align: center;
 }
 
+
 .step-title {
-  font-size: 1.5rem;
+  font-size: 2rem;
+  /* Increased from 1.5rem */
   font-weight: 600;
   margin-bottom: 1rem;
 }
 
+
 .step-desc {
-  font-size: 1rem;
+  font-size: 1.3rem;
+  /* Increased from 1rem */
+  line-height: 1.4;
 }
 
-/* Practice page */
+
+/* Summary page continue button - larger */
+.summary-page .continue-button {
+  padding: 1.5rem 3rem;
+  /* Increased padding */
+  font-size: 1.3rem;
+  /* Increased font size */
+}
+
+
+/* Practice page - Increased font sizes */
 .practice-page {
   justify-content: flex-start;
   padding-top: 6rem;
 }
+
 
 .new-practice-section {
   display: flex;
@@ -208,31 +268,40 @@ html,
   margin-bottom: 4rem;
 }
 
+
 .plus-button {
-  width: 48px;
-  height: 48px;
+  width: 80px;
+  /* Increased from 64px */
+  height: 80px;
+  /* Increased from 64px */
   background-color: white;
   color: black;
   border: 2px solid transparent;
-  font-size: 2rem;
+  font-size: 2.5rem;
+  /* Increased from 2rem */
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s;
   margin-right: 1rem;
 }
 
+
 .plus-button:hover {
   border-color: #ffc0cb;
 }
 
+
 .new-practice-text {
-  font-size: 1.8rem;
+  font-size: 2.2rem;
+  /* Increased from 1.8rem */
 }
+
 
 .past-runs-section {
   width: 100%;
   max-width: 600px;
 }
+
 
 .run-item {
   display: flex;
@@ -241,23 +310,31 @@ html,
   margin-bottom: 1.5rem;
 }
 
+
 .run-label {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
+  /* Increased from 1.5rem */
 }
+
 
 .view-insights-button {
   background-color: white;
   color: black;
   border: 2px solid transparent;
   border-radius: 50px;
-  padding: 0.5rem 1.5rem;
+  padding: 0.8rem 2rem;
+  /* Increased padding */
+  font-size: 1.1rem;
+  /* Increased font size */
   cursor: pointer;
   transition: all 0.3s;
 }
 
+
 .view-insights-button:hover {
   border-color: #ffc0cb;
 }
+
 
 /* New practice page */
 .form-section {
@@ -266,15 +343,18 @@ html,
   margin-bottom: 2rem;
 }
 
+
 .section-title {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1rem;
 }
 
+
 .dropdown-container {
   position: relative;
 }
+
 
 .dropdown-button {
   width: 100%;
@@ -290,15 +370,18 @@ html,
   align-items: center;
 }
 
+
 .dropdown-button.disabled {
   background-color: #666;
   color: #999;
   cursor: not-allowed;
 }
 
+
 .dropdown-arrow {
   margin-left: 0.5rem;
 }
+
 
 .dropdown-menu {
   position: absolute;
@@ -312,6 +395,7 @@ html,
   margin-top: 0.5rem;
 }
 
+
 .dropdown-item {
   width: 100%;
   background: none;
@@ -323,9 +407,11 @@ html,
   transition: background-color 0.3s;
 }
 
+
 .dropdown-item:hover {
   background-color: #f0f0f0;
 }
+
 
 .selected-topics {
   display: flex;
@@ -333,6 +419,7 @@ html,
   gap: 0.5rem;
   margin-top: 1rem;
 }
+
 
 .selected-topic {
   background-color: white;
@@ -344,6 +431,7 @@ html,
   gap: 0.5rem;
 }
 
+
 .remove-topic {
   background: none;
   border: none;
@@ -352,15 +440,18 @@ html,
   cursor: pointer;
 }
 
+
 .checkbox-container {
   display: flex;
   align-items: center;
   margin-top: 1rem;
 }
 
+
 .checkbox-label {
   margin-left: 0.5rem;
 }
+
 
 /* Prepare page */
 .question-text {
@@ -370,11 +461,13 @@ html,
   max-width: 600px;
 }
 
+
 .timer-container {
   position: relative;
   width: 200px;
   height: 200px;
 }
+
 
 .timer-svg {
   width: 200px;
@@ -382,11 +475,13 @@ html,
   transform: rotate(-90deg);
 }
 
+
 .timer-bg {
   fill: none;
   stroke: rgba(255, 255, 255, 0.25);
   stroke-width: 8;
 }
+
 
 .timer-progress {
   fill: none;
@@ -397,6 +492,7 @@ html,
   transition: stroke-dashoffset 1s linear;
 }
 
+
 .timer-text {
   position: absolute;
   top: 50%;
@@ -406,6 +502,183 @@ html,
   font-weight: bold;
 }
 
+
+/* Answer page - Fixed video overlay issues */
+.answer-page {
+  gap: 2rem;
+}
+
+
+.answer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+}
+
+
+.video-container {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  height: 480px;
+  background-color: #333;
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 1;
+  /* Lower z-index than buttons */
+}
+
+
+.centered-timer {
+  margin: 0 auto;
+}
+
+
+.video-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
+.recorded-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
+.camera-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: white;
+  text-align: center;
+  padding: 2rem;
+}
+
+
+.retry-button {
+  background-color: white;
+  color: black;
+  border: 2px solid transparent;
+  border-radius: 50px;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 1rem;
+}
+
+
+.retry-button:hover {
+  border-color: #ffc0cb;
+}
+
+
+/* Recording controls - Higher z-index to appear above video */
+.recording-controls {
+  display: flex;
+  gap: 1rem;
+  z-index: 10;
+  /* Higher z-index than video */
+  position: relative;
+}
+
+
+.record-button,
+.stop-button {
+  background-color: white;
+  color: black;
+  border: 2px solid transparent;
+  border-radius: 50px;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  z-index: 10;
+  /* Ensure buttons stay above video */
+  position: relative;
+}
+
+
+.record-button:hover,
+.stop-button:hover {
+  border-color: #ffc0cb;
+  transform: translateY(-2px);
+}
+
+
+.record-button:disabled {
+  background-color: #666;
+  color: #999;
+  cursor: not-allowed;
+}
+
+
+.stop-button {
+  background-color: #ff4444;
+  color: white;
+}
+
+
+.stop-button:hover {
+  background-color: #cc0000;
+}
+
+
+/* Recording status - Higher z-index */
+.recording-status {
+  display: flex;
+  justify-content: center;
+  z-index: 10;
+  position: relative;
+}
+
+
+.recording-indicator {
+  color: #ff4444;
+  font-weight: bold;
+  font-size: 1.1rem;
+  animation: pulse 1s infinite;
+}
+
+
+.recorded-indicator {
+  color: #22c55e;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+
+@keyframes pulse {
+
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+
+/* Continue button in answer page - Higher z-index */
+.answer-page .continue-button {
+  z-index: 10;
+  position: relative;
+}
+
+
 /* Completed page */
 .completion-text {
   font-size: 1.25rem;
@@ -413,6 +686,7 @@ html,
   margin-bottom: 2rem;
   max-width: 500px;
 }
+
 
 /* Practice Results Page */
 .practice-results-container {
@@ -424,12 +698,14 @@ html,
   align-items: center;
 }
 
+
 .results-title {
   font-size: 2.5rem;
   font-weight: bold;
   margin-bottom: 2rem;
   text-align: center;
 }
+
 
 .practice-summary {
   background-color: #1a1a1a;
@@ -440,15 +716,18 @@ html,
   max-width: 600px;
 }
 
+
 .summary-item {
   font-size: 1.1rem;
   margin-bottom: 1rem;
   line-height: 1.5;
 }
 
+
 .summary-item:last-child {
   margin-bottom: 0;
 }
+
 
 .scores-section {
   display: flex;
@@ -458,6 +737,7 @@ html,
   flex-wrap: wrap;
 }
 
+
 .score-item {
   display: flex;
   flex-direction: column;
@@ -465,10 +745,12 @@ html,
   gap: 1rem;
 }
 
+
 .score-item h3 {
   font-size: 1.3rem;
   font-weight: 600;
 }
+
 
 .overall-score {
   display: flex;
@@ -478,10 +760,12 @@ html,
   margin-bottom: 4rem;
 }
 
+
 .overall-score h3 {
   font-size: 1.5rem;
   font-weight: 600;
 }
+
 
 .circular-progress {
   position: relative;
@@ -490,6 +774,7 @@ html,
   justify-content: center;
 }
 
+
 .score-percentage {
   font-size: 1.2rem;
   font-weight: bold;
@@ -497,10 +782,12 @@ html,
   margin-top: 0.5rem;
 }
 
+
 .questions-feedback {
   width: 100%;
   max-width: 1200px;
 }
+
 
 .question-feedback-section {
   background-color: #1a1a1a;
@@ -512,11 +799,13 @@ html,
   gap: 2rem;
 }
 
+
 .question-video-container {
   display: flex;
   flex-direction: column;
   align-items: center;
 }
+
 
 .question-video-container h3 {
   font-size: 1.3rem;
@@ -524,10 +813,12 @@ html,
   margin-bottom: 1rem;
 }
 
+
 .video-placeholder {
   width: 100%;
   max-width: 300px;
 }
+
 
 .playback-video {
   width: 100%;
@@ -537,6 +828,7 @@ html,
   background-color: #333;
   object-fit: cover;
 }
+
 
 .mock-video {
   background-color: #333;
@@ -551,9 +843,11 @@ html,
   transition: background-color 0.3s;
 }
 
+
 .mock-video:hover {
   background-color: #444;
 }
+
 
 .play-button {
   font-size: 3rem;
@@ -561,10 +855,12 @@ html,
   margin-bottom: 1rem;
 }
 
+
 .mock-video p {
   color: #ccc;
   font-size: 0.9rem;
 }
+
 
 .feedback-columns {
   display: grid;
@@ -572,11 +868,13 @@ html,
   gap: 2rem;
 }
 
+
 .feedback-column {
   background-color: #2a2a2a;
   border-radius: 8px;
   padding: 1.5rem;
 }
+
 
 .feedback-column h4 {
   font-size: 1.2rem;
@@ -585,13 +883,16 @@ html,
   color: #22c55e;
 }
 
+
 .feedback-category {
   margin-bottom: 2rem;
 }
 
+
 .feedback-category:last-child {
   margin-bottom: 0;
 }
+
 
 .feedback-category h5 {
   font-size: 1rem;
@@ -600,10 +901,12 @@ html,
   color: #ffc0cb;
 }
 
+
 .feedback-category ul {
   list-style: none;
   padding: 0;
 }
+
 
 .feedback-category li {
   font-size: 0.9rem;
@@ -613,6 +916,7 @@ html,
   position: relative;
 }
 
+
 .feedback-category li:before {
   content: "•";
   color: #22c55e;
@@ -620,6 +924,7 @@ html,
   position: absolute;
   left: 0;
 }
+
 
 .return-home-button {
   background-color: white;
@@ -634,9 +939,11 @@ html,
   margin-top: 3rem;
 }
 
+
 .return-home-button:hover {
   border-color: #ffc0cb;
 }
+
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
@@ -644,15 +951,65 @@ html,
     grid-template-columns: 1fr;
   }
 
+
   .feedback-columns {
     grid-template-columns: 1fr;
   }
+
 
   .scores-section {
     gap: 2rem;
   }
 
+
   .practice-results-container {
     padding: 1rem;
+  }
+
+
+  /* Mobile adjustments for increased font sizes */
+  .step-title {
+    font-size: 1.6rem;
+  }
+
+
+  .step-desc {
+    font-size: 1.1rem;
+  }
+
+
+  .new-practice-text {
+    font-size: 1.8rem;
+  }
+
+
+  .run-label {
+    font-size: 1.5rem;
+  }
+
+
+  .plus-button {
+    width: 70px;
+    height: 70px;
+    font-size: 2rem;
+  }
+
+
+  /* Mobile adjustments for answer page */
+  .answer-content {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+
+  .video-container {
+    max-width: 100%;
+    height: 300px;
+  }
+
+
+  .timer-and-controls {
+    width: 100%;
+    min-width: unset;
   }
 }

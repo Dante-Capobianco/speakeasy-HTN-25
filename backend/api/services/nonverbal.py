@@ -11,8 +11,14 @@ import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 from anyio import to_thread
+import spacy
+from collections import Counter
+import nltk
+from nltk.corpus import stopwords
+nltk.download('stopwords')
 
 app = FastAPI()
+nlp = spacy.load("en_core_web_sm")
 
 # Hand Landmarker model (download on first use)
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
@@ -956,4 +962,19 @@ if __name__ == "__main__":
 #     return payload.videoUrl
 
 # class NonVerbal:
-    
+
+class VerbalRequest(BaseModel):
+    cleansedText: str
+
+@app.post("/vocab-fillers")
+async def analyze_nonverbal(req: VerbalRequest):
+    doc = nlp(req.cleansedText)
+
+    # Token-level analysis
+    words = [token.text.lower() for token in doc if token.is_alpha]  # Only words
+    unique_words = set(words)
+    vocab_richness = len(unique_words) / len(words)  # Higher = more diverse vocabulary
+
+    print("Vocabulary richness:", round(vocab_richness, 2))
+
+    return req.cleansedText

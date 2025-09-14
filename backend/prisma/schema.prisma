@@ -19,9 +19,23 @@ model PracticeRun {
     questions String[]
     timeToReadQuestion Int
     timeToAnswerQuestion Int
-    totalScore Int
-    verbalScore Int
-    nonVerbalScore Int
+    totalScore Int[]
+
+    verbalScore Int[]
+    relevanceScore Int[]
+    structureClarityScore Int[]
+    insightsScore Int[]
+    vocabScore Int[]
+    fillerWordScore Int[]
+
+    nonVerbalScore Int[]
+    facialExpressionScore Int[]
+    eyeMovementsScore Int[]
+    pausingScore Int[]
+    postureScore Int[]
+    handGesturesScore Int[]
+    spatialDistributionScore Int[]
+
     posVerbalFeedback String[]
     negVerbalFeedback String[]
     posNonverbalFeedback String[]

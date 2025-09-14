@@ -2,7 +2,6 @@ const OpenAI = require("openai");
 
 async function verbalPrompt(prompt) {
   const apiKey = process.env.MARTIAN_API_KEY; // Replace with your actual API key
-    console.log(prompt)
   const requestPayload = {
     model: "openai/gpt-4.1-nano",
     messages: [

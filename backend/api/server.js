@@ -6,6 +6,7 @@ const User = require("./user-model");
 const { PassThrough } = require("stream");
 const { analyzeVerbal } = require("./services/verbal_aa");
 const { verbalPrompt } = require("./services/promptVerbal");
+const { negativeFeedbackKeywords } = require("../constants");
 
 const server = express();
 server.use(helmet());
@@ -20,9 +21,9 @@ server.options("/", cors(corsOptions));
 const generateRelevancePrompt = (response, question, topics) => {
   let prompt = [];
   prompt.push(
-    `You are an interviewer assessing a candidate's response based on its relevance to a behavioural interview question highlighting the following topics: ${topics.join(
+    `You are an interviewer assessing a candidate's response to a behavioural interview question highlighting the following topics: ${topics.join(
       ", "
-    )}. Your response must be in the following format: "<sentence under 100 characters describing ONE relevance strength>;<sentence under 100 characters describing ONE relevance weakness>;<a number between 0 & 100 scoring relevance, no words/explanation>"`
+    )}. Your response MUST HIGHLIGHT the relevance of the response to the question and must be given in the following format: "<sentence between 50 and 125 characters describing ONE relevance strength>;<sentence between 50 and 125 characters describing ONE relevance weakness>;<a number between 0 & 100 scoring relevance, no words/explanation>"`
   );
   prompt.push(`The question is: ${question} This is the response: ${response}`);
   return prompt;
@@ -31,9 +32,9 @@ const generateRelevancePrompt = (response, question, topics) => {
 const generateStructureClarityPrompt = (response, question, topics) => {
   let prompt = [];
   prompt.push(
-    `You are an interviewer assessing the STARR structure & clarity of a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
+    `You are an interviewer assessing a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
       ", "
-    )}. Your response must be in the following format: "<sentence under 100 characters describing ONE STARR structure/clarity strength>;<sentence under 100 characters describing ONE STARR structure/clarity weakness>;<a number between 0 & 100 scoring STARR structure/clarity, no words/explanation>"`
+    )}. Your response MUST HIGHLIGHT their STARR structure & clarity and must be given in the following format: "<sentence between 50 and 125 characters describing ONE STARR structure/clarity strength>;<sentence between 50 and 125 characters describing ONE STARR structure/clarity weakness>;<a number between 0 & 100 scoring STARR structure/clarity, no words/explanation>"`
   );
   prompt.push(`The question is: ${question} This is the response: ${response}`);
   return prompt;
@@ -42,24 +43,41 @@ const generateStructureClarityPrompt = (response, question, topics) => {
 const generateInsightsPrompt = (response, question, topics) => {
   let prompt = [];
   prompt.push(
-    `You are an interviewer assessing the quality & depth of insights from a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
+    `You are an interviewer assessing a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
       ", "
-    )}. Your response must be in the following format: "<sentence under 100 characters describing ONE insight quality/depth strength>;<sentence under 100 characters describing ONE insight quality/depth weakness>;<a number between 0 & 100 scoring insight quality/depth, no words/explanation>"`
+    )}. Your response MUST HIGHLIGHT the quality & depth of insights and must be given in the following format: "<sentence between 50 and 125 characters describing ONE insight quality/depth strength>;<sentence between 50 and 125 characters describing ONE insight quality/depth weakness>;<a number between 0 & 100 scoring insight quality/depth, no words/explanation>"`
   );
   prompt.push(`The question is: ${question} This is the response: ${response}`);
   return prompt;
 };
 
+const isLengthBetween50And125 = (text) => {
+  const len = text.length;
+  return len >= 50 && len <= 125;
+};
+
+const containsNegativeFeedback = (sentence) => {
+  const lowerSentence = sentence.toLowerCase();
+
+  // check each keyword
+  return negativeFeedbackKeywords.some((keyword) =>
+    lowerSentence.includes(keyword)
+  );
+};
+
 const validateAndCleanseResponse = (response) => {
   const clean = response.split(";");
   const positivePeriods = clean[0].match(/\./g);
-  const negativePeriods = clean[0].match(/\./g);
+  const negativePeriods = clean[1].match(/\./g);
 
   if (
     clean.length - 1 !== 2 ||
     !clean[2].trim().match(/^(100|[1-9]?\d)$/) ||
     (positivePeriods && positivePeriods.length > 1) ||
-    (negativePeriods && negativePeriods.length > 1)
+    (negativePeriods && negativePeriods.length > 1) ||
+    containsNegativeFeedback(clean[0]) ||
+    !isLengthBetween50And125(clean[0]) ||
+    !isLengthBetween50And125(clean[1])
   ) {
     return null;
   }
@@ -132,12 +150,17 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     return;
   }
 
-  const verbalScore = 0;
-  const posVerbalFeedback = [];
-  const negVerbalFeedback = [];
-  const posNonverbalFeedback = [];
-  const negNonverbalFeedback = [];
-  const nonverbalScore = 0;
+  let verbalScore = 0;
+  let posVerbalFeedback = [];
+  let negVerbalFeedback = [];
+  let posNonverbalFeedback = [];
+  let negNonverbalFeedback = [];
+  let nonverbalScore = 0;
+
+  let relevanceResponse = null;
+  let structureClarityResponse = null;
+  let insightsResponse = null;
+  let cleansedText = null;
 
   // Convert response to a stream
   // const buffer = await videoFile.arrayBuffer();
@@ -156,7 +179,7 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
       return;
     }
 
-    const cleansedText = cleanseText(transcription.text);
+    cleansedText = cleanseText(transcription.text);
     const noFillersText = removeFillerWords(cleansedText);
 
     const relevancePrompt = generateRelevancePrompt(
@@ -176,10 +199,6 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
       req?.body?.question,
       req?.body?.topics
     );
-
-    let relevanceResponse = null;
-    let structureClarityResponse = null;
-    let insightsResponse = null;
 
     while (
       !relevanceResponse ||
@@ -215,8 +234,13 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     return;
   }
 
-  verbalScore += (relevanceResponse.score + structureClarityResponse.score + insightsResponse.score)
+  verbalScore +=
+    parseInt(relevanceResponse.score) +
+    parseInt(structureClarityResponse.score) +
+    parseInt(insightsResponse.score);
   verbalScore /= 3;
+  verbalScore = verbalScore.toFixed(1);
+
   posVerbalFeedback.push(relevanceResponse.positive);
   posVerbalFeedback.push(structureClarityResponse.positive);
   posVerbalFeedback.push(insightsResponse.positive);
@@ -226,7 +250,20 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
   negVerbalFeedback.push(insightsResponse.negative);
 
   //TODO: add vocab richness, filler words, and repetition (ingoring stopwords)
-  
+  const vocabAndFillersResponse = await fetch(
+    `http://127.0.0.1:8000/vocab-fillers`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ cleansedText }),
+    }
+  );
+
+  if (vocabAndFillersResponse.ok) {
+    const verbalAnalysis = await vocabAndFillersResponse.json();
+  }
 
   // NON-VERBAL ANALYSIS
   const nonverbalResponse = await fetch(`http://127.0.0.1:8000/`, {

@@ -16,6 +16,7 @@ from collections import Counter
 import nltk
 from nltk.corpus import stopwords
 import random
+
 nltk.download('stopwords')
 
 app = FastAPI()
@@ -866,7 +867,7 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
     # New scores to return (only these):
     # - facial_expression_score (from face.smile_score)
     # - eye_movements_score (from face.blinking_score)
-    # - pausing_score (inverse of face.speaking_score)
+    # - pausing_score (from face.speaking_score)
     # - posture_score (average of pose.stability_score and pose.posture_score)
     # - hand_gesture_score (average of gesture.hand_visibility_score and gesture.self_touch_score)
     # - spatial_distribution_score (from pose.space_score)
@@ -895,9 +896,8 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
     if face_blink is not None:
         aggregated_scores["eye_movements_score"] = face_blink
     if face_speaking is not None:
-        # Pausing is the inverse of speaking; keep within [0,100] and lift low scores for consistency.
-        inv = max(0, min(100, 100 - face_speaking))
-        aggregated_scores["pausing_score"] = lift_low_score(inv)
+        # Pausing should track speaking richness (more speaking -> higher pausing_score)
+        aggregated_scores["pausing_score"] = face_speaking
 
     # Pose-derived scores
     pose_posture = _get_score("pose", "posture_score")

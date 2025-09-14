@@ -388,10 +388,30 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
       "overall_score": 77
     }
    */
-  nonVerbalScore = nonverbalData.overall_score;
-  nonVerbalScores = nonverbalData.sub_scores;
-  posNonverbalFeedback = nonverbalData.descriptions.positive;
-  negNonverbalFeedback = nonverbalData.descriptions.negative;
+
+  const nv = nonverbalData?.sub_scores ?? {};
+  const mapScores = (s) => ({
+    facialExpressionScore: Number(s?.facial_expression_score ?? 0),
+    eyeMovementsScore: Number(s?.eye_movements_score ?? 0),
+    pausingScore: Number(s?.pausing_score ?? 0),
+    postureScore: Number(s?.posture_score ?? 0),
+    spatialDistributionScore: Number(s?.spatial_distribution_score ?? 0),
+    handGesturesScore: Number(s?.hand_gesture_score ?? 0),
+  });
+
+  nonVerbalScores = mapScores(nv);
+  nonVerbalScore = Number(nonverbalData?.overall_score ?? 0);
+  posNonverbalFeedback = Array.isArray(nonverbalData?.descriptions?.positive)
+    ? nonverbalData.descriptions.positive
+    : [];
+  negNonverbalFeedback = Array.isArray(nonverbalData?.descriptions?.negative)
+    ? nonverbalData.descriptions.negative
+    : [];
+  // nonVerbalScore = nonverbalData.overall_score;
+  // nonVerbalScores = nonverbalData.sub_scores;
+  // posNonverbalFeedback = nonverbalData.descriptions.positive;
+  // negNonverbalFeedback = nonverbalData.descriptions.negative;
+
 
   totalScore = (verbalScore + nonVerbalScore) / 2;
 

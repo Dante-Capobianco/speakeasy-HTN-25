@@ -438,6 +438,29 @@ function App() {
     </div>
   );
 
+  const svgRef = useRef(null);
+
+  useEffect(() => {
+    if (page === "landing" && svgRef.current) {
+      // force reflow to restart animation
+      svgRef.current.classList.remove("enter", "settle");
+      void svgRef.current.offsetWidth;
+
+      const enterTimer = setTimeout(() => {
+        svgRef.current?.classList.add("enter");
+
+        // then delay settle
+        const settleTimer = setTimeout(() => {
+          svgRef.current?.classList.add("settle");
+        }, 900);
+
+        return () => clearTimeout(settleTimer);
+      }, 2950); // delay enter
+
+      return () => clearTimeout(enterTimer);
+    }
+  }, [page]);
+
   // --- Render Pages ---
   if (page === "landing") {
     return (
@@ -451,6 +474,10 @@ function App() {
             Continue
           </button>
         )}
+
+        <div className="bg-svg-wrap" aria-hidden="true">
+          <img ref={svgRef} src="/image.png" alt="" className="bg-svg" />
+        </div>
       </div>
     );
   }

@@ -2,5 +2,6 @@ export const Path = {
   ADD_USER: "/add-user",
   GET_USER: "/get-user",
   ANALYZE_VIDEO: "/analyze-video",
-  GET_QUESTIONS: "/get-questions"
+  GET_QUESTIONS: "/get-questions",
+  CREATE_PRACTICE_RUN: "/create-practice-run"
 };

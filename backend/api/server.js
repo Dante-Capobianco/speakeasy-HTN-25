@@ -178,6 +178,17 @@ server.post(Path.ADD_USER, async (req, res, next) => {
   res.status(200).json({ userId });
 });
 
+server.post(Path.CREATE_PRACTICE_RUN, async (req, res, next) => {
+  const id = await User.createPracticeRun(
+    req?.query?.id,
+    req?.body?.practiceTopics,
+    req?.body?.questions,
+    45,
+    75
+  );
+  res.status(200).json({ id });
+});
+
 server.post(Path.GET_QUESTIONS, async (req, res, next) => {
   let questions = null;
   let clean;
@@ -420,14 +431,6 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
   // negNonverbalFeedback = nonverbalData.descriptions.negative;
 
   totalScore = parseInt(((verbalScore + nonVerbalScore) / 2).toFixed(1));
-  
-  // const id = await User.createPracticeRun(
-  //   userId,
-  //   ["Comms", "Prob"],
-  //   ["Q1", "Q2"],
-  //   45,
-  //   75
-  // );
 
   await User.storePracticeVideoResults(
     parseInt(req?.body?.practiceRunId),

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
+import { addUser, generateQuestions, getUser } from "./utils/helperFunctions";
+import { Path } from "./utils/enums";
 
 function App() {
   // --- Landing Page ---
@@ -24,7 +26,6 @@ function App() {
   const [isPreparing, setIsPreparing] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(1);
 
-
   // --- Video Recording States ---
   const [answerTimeLeft, setAnswerTimeLeft] = useState(0);
   const [isAnswering, setIsAnswering] = useState(false);
@@ -34,13 +35,29 @@ function App() {
   const [stream, setStream] = useState(null);
   const [cameraError, setCameraError] = useState(null);
 
+  // Backend states
+  const [userId, setUserId] = useState(null);
+  const [user, setUser] = useState(null);
+
   const videoRef = useRef(null);
   const recordedVideoRef = useRef(null);
 
-  const dropdownTopics = ["Teamwork", "Problem Solving", "Leadership/Initiative", "Adaptability", "Communication", "Project Management"];
+  const dropdownTopics = [
+    "Teamwork",
+    "Problem Solving",
+    "Leadership/Initiative",
+    "Adaptability",
+    "Communication",
+    "Project Management",
+  ];
 
   // --- Typing Effect for Landing Page ---
   useEffect(() => {
+    const getUserObj = async () => {
+      const user = await getUser(userId);
+      setUser(user);
+    };
+
     if (page === "landing") {
       let index = 0;
       const interval = setInterval(() => {
@@ -52,6 +69,8 @@ function App() {
         }
       }, 150);
       return () => clearInterval(interval);
+    } else if (page === "practice") {
+      getUserObj();
     }
   }, [page]);
 
@@ -60,7 +79,7 @@ function App() {
     let timer;
     if (isPreparing && prepTimeLeft > 0) {
       timer = setInterval(() => {
-        setPrepTimeLeft(prev => {
+        setPrepTimeLeft((prev) => {
           if (prev <= 1) {
             setIsPreparing(false);
             setPage("answer");
@@ -90,13 +109,12 @@ function App() {
     setIsPreparing(true);
   }, [page, currentQuestion, prepTime]);
 
-
   // --- Answer Timer Effect ---
   useEffect(() => {
     let timer;
     if (isAnswering && answerTimeLeft > 0 && page === "answer") {
       timer = setInterval(() => {
-        setAnswerTimeLeft(prev => {
+        setAnswerTimeLeft((prev) => {
           if (prev <= 1) {
             // Auto-stop recording when time is up
             stopRecording();
@@ -128,7 +146,7 @@ function App() {
       setCameraError(null);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { width: 640, height: 480 },
-        audio: true
+        audio: true,
       });
 
       setStream(mediaStream);
@@ -143,7 +161,7 @@ function App() {
 
   const stopCamera = () => {
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach((track) => track.stop());
       setStream(null);
     }
   };
@@ -161,7 +179,7 @@ function App() {
       setIsAnswering(false);
 
       const recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9'
+        mimeType: "video/webm;codecs=vp9",
       });
 
       const chunks = [];
@@ -173,7 +191,7 @@ function App() {
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
+        const blob = new Blob(chunks, { type: "video/webm" });
         setRecordedBlob(blob);
         setIsRecording(false);
         setIsAnswering(false);
@@ -190,12 +208,11 @@ function App() {
         "2 min": 120,
         "2 min 30 s": 150,
         "3 min": 180,
-        "5 min": 300
+        "5 min": 300,
       };
       const timeInSeconds = answerTimeMap[answerTime] || 120;
       setAnswerTimeLeft(timeInSeconds);
       setIsAnswering(true);
-
     } catch (error) {
       console.error("Error starting recording:", error);
       setCameraError("Unable to start recording. Please try again.");
@@ -217,11 +234,15 @@ function App() {
     }
   };
 
-  const handleContinue = () => {
-    if (selectedTopics.length === 3) {
-      setUserTopics(selectedTopics);
-      setPage("summary");
-    }
+  const handleContinue = async () => {
+    try {
+      const id = await addUser(selectedTopics);
+      setUserId(id);
+      if (selectedTopics.length === 3) {
+        setUserTopics(selectedTopics);
+        setPage("summary");
+      }
+    } catch (err) {}
   };
 
   const addPracticeTopic = (topic) => {
@@ -232,11 +253,38 @@ function App() {
   };
 
   const removePracticeTopic = (topic) => {
-    setPracticeTopics(practiceTopics.filter(t => t !== topic));
+    setPracticeTopics(practiceTopics.filter((t) => t !== topic));
   };
 
-  const startPractice = () => {
+  const startPractice = async () => {
     const numQ = parseInt(questionQty, 10) || 1;
+
+    try {
+      const questions = await generateQuestions(numQ, practiceTopics)
+
+      const response = await fetch(
+        `${import.meta.env.VITE_BASE_URL}${
+          Path.CREATE_PRACTICE_RUN
+        }?id=${userId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ practiceTopics, questions }),
+        }
+      );
+
+      if (response.ok) {
+        const userObject = await response.json();
+        return userObject.user;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      return null;
+    }
+
     setTotalQuestions(numQ);
     setCurrentQuestion(1);
 
@@ -252,7 +300,7 @@ function App() {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleAnswerComplete = () => {
@@ -263,10 +311,7 @@ function App() {
   // --- Header Component ---
   const Header = () => (
     <div className="header">
-      <button
-        onClick={() => setPage("landing")}
-        className="header-button"
-      >
+      <button onClick={() => setPage("landing")} className="header-button">
         SpeakEasy
       </button>
     </div>
@@ -281,10 +326,7 @@ function App() {
           <span className="cursor">|</span>
         </h1>
         {displayedText === fullText && (
-          <button
-            onClick={() => setPage("topics")}
-            className="continue-button"
-          >
+          <button onClick={() => setPage("topics")} className="continue-button">
             Continue
           </button>
         )}
@@ -313,7 +355,7 @@ function App() {
               <button
                 key={topic}
                 onClick={() => toggleTopic(topic)}
-                className={`topic-button ${isSelected ? 'selected' : ''}`}
+                className={`topic-button ${isSelected ? "selected" : ""}`}
               >
                 {topic}
               </button>
@@ -323,7 +365,9 @@ function App() {
         <button
           onClick={handleContinue}
           disabled={selectedTopics.length === 0}
-          className={`continue-button ${selectedTopics.length === 0 ? 'disabled' : ''}`}
+          className={`continue-button ${
+            selectedTopics.length === 0 ? "disabled" : ""
+          }`}
         >
           Continue
         </button>
@@ -333,9 +377,18 @@ function App() {
 
   if (page === "summary") {
     const steps = [
-      { title: "Choose what to practice", desc: "Pick the skills you want to focus on." },
-      { title: "Mimic real world 1 way interviews", desc: "Practice in a realistic environment." },
-      { title: "Gain insights, iterate, improve", desc: "Get feedback and refine your skills." },
+      {
+        title: "Choose what to practice",
+        desc: "Pick the skills you want to focus on.",
+      },
+      {
+        title: "Mimic real world 1 way interviews",
+        desc: "Practice in a realistic environment.",
+      },
+      {
+        title: "Gain insights, iterate, improve",
+        desc: "Get feedback and refine your skills.",
+      },
     ];
 
     return (
@@ -350,10 +403,7 @@ function App() {
             </div>
           ))}
         </div>
-        <button
-          onClick={() => setPage("practice")}
-          className="continue-button"
-        >
+        <button onClick={() => setPage("practice")} className="continue-button">
           Start Practicing
         </button>
       </div>
@@ -382,12 +432,10 @@ function App() {
         </div>
 
         <div className="past-runs-section">
-          {pastRuns.map((run) => (
+          {user?.practiceRuns?.map((run) => (
             <div key={run.id} className="run-item">
               <span className="run-label">{run.label}</span>
-              <button className="view-insights-button">
-                View Insights
-              </button>
+              <button className="view-insights-button">View Insights</button>
             </div>
           ))}
         </div>
@@ -495,18 +543,20 @@ function App() {
 
             {showPrepDropdown && (
               <div className="dropdown-menu">
-                {["15 s", "30 s", "45 s", "1 min", "1min 15 sec"].map((time) => (
-                  <button
-                    key={time}
-                    onClick={() => {
-                      setPrepTime(time);
-                      setShowPrepDropdown(false);
-                    }}
-                    className="dropdown-item"
-                  >
-                    {time}
-                  </button>
-                ))}
+                {["15 s", "30 s", "45 s", "1 min", "1 min 15 sec"].map(
+                  (time) => (
+                    <button
+                      key={time}
+                      onClick={() => {
+                        setPrepTime(time);
+                        setShowPrepDropdown(false);
+                      }}
+                      className="dropdown-item"
+                    >
+                      {time}
+                    </button>
+                  )
+                )}
               </div>
             )}
           </div>
@@ -525,27 +575,26 @@ function App() {
 
             {showAnswerDropdown && (
               <div className="dropdown-menu">
-                {["1 min 30 s", "2 min", "2 min 30 s", "3 min", "5 min"].map((time) => (
-                  <button
-                    key={time}
-                    onClick={() => {
-                      setAnswerTime(time);
-                      setShowAnswerDropdown(false);
-                    }}
-                    className="dropdown-item"
-                  >
-                    {time}
-                  </button>
-                ))}
+                {["1 min 30 s", "2 min", "2 min 30 s", "3 min", "5 min"].map(
+                  (time) => (
+                    <button
+                      key={time}
+                      onClick={() => {
+                        setAnswerTime(time);
+                        setShowAnswerDropdown(false);
+                      }}
+                      className="dropdown-item"
+                    >
+                      {time}
+                    </button>
+                  )
+                )}
               </div>
             )}
           </div>
         </div>
 
-        <button
-          onClick={startPractice}
-          className="get-started-button"
-        >
+        <button onClick={startPractice} className="get-started-button">
           Get Started!
         </button>
       </div>
@@ -553,8 +602,17 @@ function App() {
   }
 
   if (page === "prepare") {
-    const totalTime = prepTime === "15 s" ? 15 : prepTime === "30 s" ? 30 : prepTime === "45 s" ? 45 : prepTime === "1 min" ? 60 : 75;
-    const progress = (totalTime - prepTimeLeft) / totalTime * 283; // 283 is circumference of circle with radius 45
+    const totalTime =
+      prepTime === "15 s"
+        ? 15
+        : prepTime === "30 s"
+        ? 30
+        : prepTime === "45 s"
+        ? 45
+        : prepTime === "1 min"
+        ? 60
+        : 75;
+    const progress = ((totalTime - prepTimeLeft) / totalTime) * 283; // 283 is circumference of circle with radius 45
 
     return (
       <div className="prepare-page">
@@ -562,30 +620,24 @@ function App() {
 
         <h2 className="page-title">Prepare: Question {currentQuestion}</h2>
         <h3 className="question-text">
-          Describe a time when you had to work as part of a team to solve a difficult problem.
+          Describe a time when you had to work as part of a team to solve a
+          difficult problem.
         </h3>
 
         <div className="timer-container">
           <svg className="timer-svg">
-            <circle
-              className="timer-bg"
-              cx="100"
-              cy="100"
-              r="45"
-            />
+            <circle className="timer-bg" cx="100" cy="100" r="45" />
             <circle
               className="timer-progress"
               cx="100"
               cy="100"
               r="45"
               style={{
-                strokeDashoffset: 283 - progress
+                strokeDashoffset: 283 - progress,
               }}
             />
           </svg>
-          <div className="timer-text">
-            {formatTime(prepTimeLeft)}
-          </div>
+          <div className="timer-text">{formatTime(prepTimeLeft)}</div>
         </div>
       </div>
     );
@@ -597,10 +649,12 @@ function App() {
       "2 min": 120,
       "2 min 30 s": 150,
       "3 min": 180,
-      "5 min": 300
+      "5 min": 300,
     };
     const totalTime = answerTimeMap[answerTime] || 120;
-    const progress = isAnswering ? (totalTime - answerTimeLeft) / totalTime * 283 : 0;
+    const progress = isAnswering
+      ? ((totalTime - answerTimeLeft) / totalTime) * 283
+      : 0;
 
     return (
       <div className="answer-page">
@@ -608,7 +662,8 @@ function App() {
 
         <h2 className="page-title">Answer: Question {currentQuestion}</h2>
         <h3 className="question-text">
-          Describe a time when you had to work as part of a team to solve a difficult problem.
+          Describe a time when you had to work as part of a team to solve a
+          difficult problem.
         </h3>
 
         <div className="video-container">
@@ -621,12 +676,7 @@ function App() {
             </div>
           ) : (
             <>
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                className="video-preview"
-              />
+              <video ref={videoRef} autoPlay muted className="video-preview" />
 
               {recordedBlob && (
                 <video
@@ -643,25 +693,18 @@ function App() {
         {isAnswering && (
           <div className="timer-container">
             <svg className="timer-svg">
-              <circle
-                className="timer-bg"
-                cx="100"
-                cy="100"
-                r="45"
-              />
+              <circle className="timer-bg" cx="100" cy="100" r="45" />
               <circle
                 className="timer-progress"
                 cx="100"
                 cy="100"
                 r="45"
                 style={{
-                  strokeDashoffset: 283 - progress
+                  strokeDashoffset: 283 - progress,
                 }}
               />
             </svg>
-            <div className="timer-text">
-              {formatTime(answerTimeLeft)}
-            </div>
+            <div className="timer-text">{formatTime(answerTimeLeft)}</div>
           </div>
         )}
 
@@ -677,27 +720,25 @@ function App() {
           )}
 
           {isRecording && (
-            <button
-              onClick={stopRecording}
-              className="stop-button"
-            >
+            <button onClick={stopRecording} className="stop-button">
               Stop Recording
             </button>
           )}
 
           {recordedBlob && (
-            <button
-              onClick={handleAnswerComplete}
-              className="continue-button"
-            >
+            <button onClick={handleAnswerComplete} className="continue-button">
               Continue
             </button>
           )}
         </div>
 
         <div className="recording-status">
-          {isRecording && <span className="recording-indicator">● Recording...</span>}
-          {recordedBlob && <span className="recorded-indicator">✓ Recording Complete</span>}
+          {isRecording && (
+            <span className="recording-indicator">● Recording...</span>
+          )}
+          {recordedBlob && (
+            <span className="recorded-indicator">✓ Recording Complete</span>
+          )}
         </div>
       </div>
     );
@@ -710,7 +751,8 @@ function App() {
 
         <h2 className="page-title">Question {currentQuestion} Completed</h2>
         <p className="completion-text">
-          Great job! This video is currently being analyzed. Proceed to the next question when you are ready!
+          Great job! This video is currently being analyzed. Proceed to the next
+          question when you are ready!
         </p>
 
         {currentQuestion < totalQuestions ? (
@@ -743,13 +785,21 @@ function App() {
     const verbalScore = 50;
     const overallScore = 50;
 
-    const CircularProgress = ({ percentage, size = 120, strokeWidth = 8, color = "#22c55e" }) => {
+    const CircularProgress = ({
+      percentage,
+      size = 120,
+      strokeWidth = 8,
+      color = "#22c55e",
+    }) => {
       const radius = (size - strokeWidth) / 2;
       const circumference = radius * 2 * Math.PI;
       const offset = circumference - (percentage / 100) * circumference;
 
       return (
-        <div className="circular-progress" style={{ width: size, height: size }}>
+        <div
+          className="circular-progress"
+          style={{ width: size, height: size }}
+        >
           <svg width={size} height={size}>
             <circle
               cx={size / 2}
@@ -770,9 +820,9 @@ function App() {
               strokeDashoffset={offset}
               strokeLinecap="round"
               style={{
-                transition: 'stroke-dashoffset 0.5s ease-in-out',
-                transform: 'rotate(-90deg)',
-                transformOrigin: '50% 50%'
+                transition: "stroke-dashoffset 0.5s ease-in-out",
+                transform: "rotate(-90deg)",
+                transformOrigin: "50% 50%",
               }}
             />
           </svg>
@@ -819,7 +869,11 @@ function App() {
 
           <div className="overall-score">
             <h3>Overall</h3>
-            <CircularProgress percentage={overallScore} size={150} strokeWidth={10} />
+            <CircularProgress
+              percentage={overallScore}
+              size={150}
+              strokeWidth={10}
+            />
             <div className="score-percentage">{overallScore}%</div>
           </div>
 
@@ -845,9 +899,16 @@ function App() {
                     <div className="feedback-category">
                       <h5>Verbal</h5>
                       <ul>
-                        <li>Clear articulation and confident tone throughout the response</li>
-                        <li>Good use of specific examples to support your points</li>
-                        <li>Structured response with logical flow and conclusion</li>
+                        <li>
+                          Clear articulation and confident tone throughout the
+                          response
+                        </li>
+                        <li>
+                          Good use of specific examples to support your points
+                        </li>
+                        <li>
+                          Structured response with logical flow and conclusion
+                        </li>
                       </ul>
                     </div>
 
@@ -855,7 +916,9 @@ function App() {
                       <h5>Non-Verbal</h5>
                       <ul>
                         <li>Maintained good eye contact with the camera</li>
-                        <li>Natural hand gestures that complemented your speech</li>
+                        <li>
+                          Natural hand gestures that complemented your speech
+                        </li>
                         <li>Confident posture and professional appearance</li>
                       </ul>
                     </div>
@@ -867,18 +930,29 @@ function App() {
                     <div className="feedback-category">
                       <h5>Verbal</h5>
                       <ul>
-                        <li>Could use more specific metrics or outcomes in examples</li>
-                        <li>Some filler words detected that could be reduced</li>
-                        <li>Response could benefit from more concise phrasing</li>
+                        <li>
+                          Could use more specific metrics or outcomes in
+                          examples
+                        </li>
+                        <li>
+                          Some filler words detected that could be reduced
+                        </li>
+                        <li>
+                          Response could benefit from more concise phrasing
+                        </li>
                       </ul>
                     </div>
 
                     <div className="feedback-category">
                       <h5>Non-Verbal</h5>
                       <ul>
-                        <li>Occasional fidgeting with hands could be minimized</li>
+                        <li>
+                          Occasional fidgeting with hands could be minimized
+                        </li>
                         <li>Could maintain more consistent eye contact</li>
-                        <li>Facial expressions could be more varied and engaging</li>
+                        <li>
+                          Facial expressions could be more varied and engaging
+                        </li>
                       </ul>
                     </div>
                   </div>

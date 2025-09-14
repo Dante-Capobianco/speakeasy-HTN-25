@@ -1,7 +1,6 @@
-import dotenv from "dotenv";
-import server from "./api/server.js"; // note the .js extension
+require("dotenv").config();
 
-dotenv.config();
+const server = require("./api/server");
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

@@ -48,18 +48,49 @@ function App() {
   const [doneAnalyzing, setDoneAnalyzing] = useState(true);
   const [doneCollectingData, setDoneCollectingData] = useState(true);
   const [pracRun, setPracRun] = useState(null);
+  const [videosLoaded, setVideosLoaded] = useState(0);
 
   const videoRef = useRef(null);
   const recordedVideoRef = useRef(null);
 
   // Dynamic dropdown topics based on user selection
   const topicSubcategories = {
-    Teamwork: ["Collaboration", "Trust", "Conflict"],
-    "Problem Solving": ["Analysis", "Creativity", "Decisions"],
-    "Leadership/Initiative": ["Motivation", "Delegation", "Change"],
-    Adaptability: ["Learning", "Uncertainty", "Priorities"],
-    Communication: ["Listening", "Clarity", "Influence"],
-    "Project Management": ["Planning", "Resources", "Risk"],
+    Teamwork: [
+      "Collaboration",
+      "Trust Building",
+      "Conflict Resolution",
+      "Cross-Functional Work",
+    ],
+    "Problem Solving": [
+      "Analytical Thinking",
+      "Creativity & Innovation",
+      "Decision Making",
+      "Troubleshooting",
+    ],
+    "Leadership/Initiative": [
+      "Motivating Others",
+      "Delegation & Empowerment",
+      "Driving Change",
+      "Vision Setting",
+    ],
+    Adaptability: [
+      "Learning Agility",
+      "Managing Uncertainty",
+      "Handling Feedback",
+      "Flexibility in Approach",
+    ],
+    Communication: [
+      "Active Listening",
+      "Clarity of Expression",
+      "Influence & Persuasion",
+      "Presentation Skills",
+    ],
+    "Project Management": [
+      "Planning & Scheduling",
+      "Resource Allocation",
+      "Risk Management",
+      "Budget & Timeline Management",
+    ],
   };
 
   const getUserObj = async () => {
@@ -68,7 +99,7 @@ function App() {
     setDoneCollectingData(true);
     if (currPracRunId) {
       setPracRun(
-        user.user.practiceRuns.find((pracRun) => pracRun.id === currPracRunId)
+        user.practiceRuns.find((pracRun) => pracRun.id === currPracRunId)
       );
     }
   };
@@ -103,7 +134,12 @@ function App() {
     }
   }, [page]);
   useEffect(() => {
-    if (doneAnalyzing && currentQuestion >= totalQuestions) {
+    if (
+      doneAnalyzing &&
+      videosLoaded >= totalQuestions &&
+      currentQuestion >= totalQuestions &&
+      currPracRunId
+    ) {
       getUserObj();
     }
   }, [doneAnalyzing]);
@@ -249,6 +285,7 @@ function App() {
           );
 
           setDoneAnalyzing(success ? true : false);
+          setVideosLoaded((prev) => prev + 1);
         };
 
         const blob = new Blob(chunks, { type: "video/webm" });
@@ -298,12 +335,16 @@ function App() {
     }
   };
 
-  const handleContinue = () => {
-    if (selectedTopics.length >= 1) {
-      // Changed from === 3 to >= 1
-      setUserTopics(selectedTopics);
-      setPage("summary");
-    }
+  const handleContinue = async () => {
+    try {
+      const id = await addUser(selectedTopics);
+      setUserId(10);
+      if (selectedTopics.length >= 1) {
+        // Changed from === 3 to >= 1
+        setUserTopics(selectedTopics);
+        setPage("summary");
+      }
+    } catch (err) {}
   };
 
   const addPracticeTopic = (topic) => {
@@ -382,7 +423,7 @@ function App() {
   // --- Header Component ---
   const Header = () => (
     <div className="header">
-      <button onClick={() => setPage("landing")} className="header-button">
+      <button onClick={() => setPage("practice")} className="header-button">
         SpeakEasy
       </button>
     </div>
@@ -450,15 +491,15 @@ function App() {
     const steps = [
       {
         title: "Choose what to practice",
-        desc: "Pick the skills you want to focus on.",
+        desc: "Pick the subtopics, number of questions & time to prep/present.",
       },
       {
-        title: "Mimic real world 1 way interviews",
-        desc: "Practice in a realistic environment.",
+        title: "Mimic real-world 1-way interviews",
+        desc: "Practice in a realistic environment with timed responses.",
       },
       {
-        title: "Gain insights, iterate, improve",
-        desc: "Get feedback and refine your skills.",
+        title: "Gain insights, iterate, improve!",
+        desc: "Get real-time, AI-powered insights on verbal & non-verbal skills across 11 metrics to refine your skills.",
       },
     ];
 
@@ -467,9 +508,12 @@ function App() {
         <Header />
         <h2 className="page-title">What happens next</h2>
         <div className="steps-grid">
-          {steps.map((step) => (
+          {steps.map((step, idx) => (
             <div key={step.title} className="step-item">
-              <h3 className="step-title">{step.title}</h3>
+              <h3 className="step-title">
+                <span style={{ fontSize: "50px" }}>{`${idx + 1}. `}</span>
+                {`${step.title}`}
+              </h3>
               <p className="step-desc">{step.desc}</p>
             </div>
           ))}
@@ -496,10 +540,14 @@ function App() {
           <span className="new-practice-text">Start new practice</span>
         </div>
 
+        <div className="barrier" style={{width: "80%", marginTop: "10px"}}></div>
+
+        <h3 className="past-runs">Past Practice Runs</h3>
+
         <div className="past-runs-section">
-          {pastRuns.map((run) => (
+          {user?.practiceRuns?.map((run, idx) => (
             <div key={run.id} className="run-item">
-              <span className="run-label">{run.label}</span>
+              <span className="run-label">Practice Run #{idx + 1}</span>
               <button className="view-insights-button">View Insights</button>
             </div>
           ))}
@@ -516,7 +564,7 @@ function App() {
         <h2 className="page-title">New Practice Run</h2>
 
         <div className="form-section">
-          <h3 className="section-title">Topics</h3>
+          <h3 className="section-title">Sub-Topics</h3>
           <div className="dropdown-container">
             <button
               onClick={() => setShowTopicsDropdown(!showTopicsDropdown)}
@@ -838,12 +886,9 @@ function App() {
 
   if (page === "practiceComplete") {
     // Mock data - will be fetched from backend later
-    const nonVerbalScore = 50;
-    const verbalScore = 50;
-    const overallScore = 50;
-
     const CircularProgress = ({
       percentage,
+      breakdown = [],
       size = 120,
       strokeWidth = 8,
       color = "#22c55e",
@@ -894,6 +939,17 @@ function App() {
               }}
             />
           </svg>
+
+          {/* Tooltip */}
+          {breakdown.length > 0 && (
+            <div className="circular-tooltip">
+              <ul>
+                {breakdown.map((item, idx) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       );
     };
@@ -908,7 +964,7 @@ function App() {
           {/* Practice Summary */}
           <div className="practice-summary">
             <div className="summary-item">
-              <strong>Topics:</strong>{" "}
+              <strong>Sub-Topic(s):</strong>{" "}
               {pracRun ? pracRun.topics.join(", ") : ""}
             </div>
             <div className="summary-item">
@@ -925,119 +981,161 @@ function App() {
             </div>
           </div>
 
-          {/* Scores Section */}
-          <div className="scores-section">
-            <div className="score-item">
-              <h3>Non-Verbal</h3>
-              <CircularProgress
-                percentage={pracRun ? pracRun.nonVerbalScore : 0}
-              />
-              <div className="score-percentage">
-                {pracRun ? pracRun.nonVerbalScore : 0}%
-              </div>
-            </div>
-            <div className="score-item">
-              <h3>Verbal</h3>
-              <CircularProgress
-                percentage={pracRun ? pracRun.verbalScore : 0}
-              />
-              <div className="score-percentage">
-                {pracRun ? pracRun.verbalScore : 0}%
-              </div>
-            </div>
-          </div>
-
-          <div className="overall-score">
-            <h3>Overall</h3>
-            <CircularProgress
-              percentage={overallScore}
-              size={150}
-              strokeWidth={10}
-            />
-            <div className="score-percentage">{overallScore}%</div>
-          </div>
+          <div className="barrier"></div>
 
           {/* Question Feedback Tables */}
           <div className="questions-feedback">
             {Array.from({ length: totalQuestions }, (_, index) => (
-              <div key={index + 1} className="question-feedback-section">
-                <div className="question-video-container">
-                  <h3>Question {index + 1}</h3>
-                  <div className="video-placeholder">
-                    {/* Placeholder for video - will be actual recorded video */}
-                    <div className="mock-video">
-                      <div className="play-button">▶</div>
-                      <p>Recorded Video {index + 1}</p>
+              <>
+                {/* Scores Section */}
+                <div className="scores-section">
+                  <div className="score-item">
+                    <h3>Non-Verbal</h3>
+                    <CircularProgress
+                      percentage={pracRun ? pracRun.nonVerbalScore[index] : 0}
+                      breakdown={
+                        pracRun
+                          ? [
+                              `Eye Movements: ${pracRun.eyeMovementsScore[index]}%`,
+                              `Facial Expression: ${pracRun.facialExpressionScore[index]}%`,
+                              `Hand Gestures: ${pracRun.handGesturesScore[index]}%`,
+                              `Pausing: ${pracRun.pausingScore[index]}%`,
+                              `Posture: ${pracRun.postureScore[index]}%`,
+                              `Spatial Distribution: ${pracRun.spatialDistributionScore[index]}%`,
+                            ]
+                          : []
+                      }
+                    />
+                    <div className="score-percentage">
+                      {pracRun ? pracRun.nonVerbalScore[index] : 0}%
+                    </div>
+                  </div>
+                  <div className="score-item">
+                    <h3>Verbal</h3>
+                    <CircularProgress
+                      percentage={pracRun ? pracRun.verbalScore[index] : 0}
+                      breakdown={
+                        pracRun
+                          ? [
+                              `Relevance: ${pracRun.relevanceScore[index]}%`,
+                              `Structure & Clarity: ${pracRun.structureClarityScore[index]}%`,
+                              `Insight Quality: ${pracRun.insightsScore[index]}%`,
+                              `Vocabulary: ${pracRun.vocabScore[index]}%`,
+                              `Minimal Filler Words: ${pracRun.fillerWordScore[index]}%`,
+                            ]
+                          : []
+                      }
+                    />
+                    <div className="score-percentage">
+                      {pracRun ? pracRun.verbalScore[index] : 0}%
                     </div>
                   </div>
                 </div>
 
-                <div className="feedback-columns">
-                  <div className="feedback-column">
-                    <h4>Feedback on Strengths</h4>
+                <div className="overall-score">
+                  <h3>Overall</h3>
+                  <CircularProgress
+                    percentage={pracRun ? pracRun.totalScore[index] : 0}
+                    size={150}
+                    strokeWidth={10}
+                  />
+                  <div className="score-percentage">
+                    {pracRun ? pracRun.totalScore[index] : 0}%
+                  </div>
+                </div>
 
-                    <div className="feedback-category">
-                      <h5>Verbal</h5>
-                      <ul>
-                        <li>
-                          Clear articulation and confident tone throughout the
-                          response
-                        </li>
-                        <li>
-                          Good use of specific examples to support your points
-                        </li>
-                        <li>
-                          Structured response with logical flow and conclusion
-                        </li>
-                      </ul>
-                    </div>
-
-                    <div className="feedback-category">
-                      <h5>Non-Verbal</h5>
-                      <ul>
-                        <li>Maintained good eye contact with the camera</li>
-                        <li>
-                          Natural hand gestures that complemented your speech
-                        </li>
-                        <li>Confident posture and professional appearance</li>
-                      </ul>
+                <div key={index + 1} className="question-feedback-section">
+                  <div className="question-video-container">
+                    <h3 style={{ textAlign: "center" }}>
+                      Question {index + 1}:{" "}
+                      <span style={{ fontSize: "15px" }}>
+                        {questions[index].question}
+                      </span>
+                    </h3>
+                    <div className="video-placeholder">
+                      {pracRun ? (
+                        <video
+                          width="100%"
+                          controls
+                          src={pracRun.videos[index]}
+                          className="recorded-video"
+                        ></video>
+                      ) : (
+                        <div className="mock-video">
+                          <div className="play-button">▶</div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="feedback-column">
-                    <h4>Feedback on Weaknesses</h4>
+                  <div className="feedback-columns">
+                    <div className="feedback-column">
+                      <h4>Feedback on Strengths</h4>
 
-                    <div className="feedback-category">
-                      <h5>Verbal</h5>
-                      <ul>
-                        <li>
-                          Could use more specific metrics or outcomes in
-                          examples
-                        </li>
-                        <li>
-                          Some filler words detected that could be reduced
-                        </li>
-                        <li>
-                          Response could benefit from more concise phrasing
-                        </li>
-                      </ul>
+                      <div className="feedback-category">
+                        <h5>Verbal</h5>
+                        <ul>
+                          {pracRun ? (
+                            JSON.parse(pracRun.posVerbalFeedback[index]).map(
+                              (item, index) => <li key={index}>{item}</li>
+                            )
+                          ) : (
+                            <></>
+                          )}
+                        </ul>
+                      </div>
+
+                      <div className="feedback-category">
+                        <h5>Non-Verbal</h5>
+                        <ul>
+                          {pracRun ? (
+                            JSON.parse(pracRun.posNonverbalFeedback[index]).map(
+                              (item, index) => <li key={index}>{item}</li>
+                            )
+                          ) : (
+                            <></>
+                          )}
+                        </ul>
+                      </div>
                     </div>
 
-                    <div className="feedback-category">
-                      <h5>Non-Verbal</h5>
-                      <ul>
-                        <li>
-                          Occasional fidgeting with hands could be minimized
-                        </li>
-                        <li>Could maintain more consistent eye contact</li>
-                        <li>
-                          Facial expressions could be more varied and engaging
-                        </li>
-                      </ul>
+                    <div className="feedback-column">
+                      <h4>Feedback on Weaknesses</h4>
+
+                      <div className="feedback-category">
+                        <h5>Verbal</h5>
+                        <ul>
+                          {pracRun ? (
+                            JSON.parse(pracRun.negVerbalFeedback[index]).map(
+                              (item, index) => <li key={index}>{item}</li>
+                            )
+                          ) : (
+                            <></>
+                          )}
+                        </ul>
+                      </div>
+
+                      <div className="feedback-category">
+                        <h5>Non-Verbal</h5>
+                        <ul>
+                          {pracRun ? (
+                            JSON.parse(pracRun.negNonverbalFeedback[index]).map(
+                              (item, index) => <li key={index}>{item}</li>
+                            )
+                          ) : (
+                            <></>
+                          )}
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+                {index !== totalQuestions - 1 ? (
+                  <div className="barrier"></div>
+                ) : (
+                  <></>
+                )}
+              </>
             ))}
           </div>
 

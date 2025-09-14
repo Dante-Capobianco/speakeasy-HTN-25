@@ -1,5 +1,5 @@
 {
-  "type": "module",
+  "type": "commonjs",
   "name": "backend",
   "version": "1.0.0",
   "description": "",
@@ -9,7 +9,7 @@
     "start": "node index.js",
     "build": "npm install && npm run db:init",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset --force",
+    "db:reset ": "prisma migrate reset --force",
     "db:init": "npm run db:reset && npm run db:migrate"
   },
   "keywords": [],

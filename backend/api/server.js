@@ -1,12 +1,11 @@
-const { Path } = require("../../frontend/src/utils/enums");
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const User = require("./user-model");
-const { PassThrough } = require("stream");
 const { analyzeVerbal } = require("./services/verbal_aa");
 const { verbalPrompt, questionPrompt } = require("./services/promptVerbal");
 const { negativeFeedbackKeywords } = require("../constants");
+const { Path } = require("../../frontend/src/utils/enums");
 
 const server = express();
 
@@ -26,7 +25,7 @@ const generateRelevancePrompt = (response, question, topics) => {
   prompt.push(
     `You are an interviewer assessing a candidate's response to a behavioural interview question highlighting the following topics: ${topics.join(
       ", "
-    )}. Your response MUST HIGHLIGHT the relevance of the response to the question and must be given in the following format: "<sentence between 50 and 125 characters describing ONE relevance strength>;<sentence between 50 and 125 characters describing ONE relevance weakness>;<a number between 0 & 100 scoring relevance, no words/explanation>"`
+    )}. Your response MUST HIGHLIGHT the relevance of the response to the question and must be given in the following format: "<positive sentence between 50 and 125 characters describing ONE relevance strength>;<sentence between 50 and 125 characters describing ONE relevance weakness, no linking words to the strength>;<a number between 0 & 100 scoring relevance, no words/explanation>"`
   );
   prompt.push(`The question is: ${question} This is the response: ${response}`);
   return prompt;
@@ -37,7 +36,7 @@ const generateStructureClarityPrompt = (response, question, topics) => {
   prompt.push(
     `You are an interviewer assessing a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
       ", "
-    )}. Your response MUST HIGHLIGHT their STARR structure & clarity and must be given in the following format: "<sentence between 50 and 125 characters describing ONE STARR structure/clarity strength>;<sentence between 50 and 125 characters describing ONE STARR structure/clarity weakness>;<a number between 0 & 100 scoring STARR structure/clarity, no words/explanation>"`
+    )}. Your response MUST HIGHLIGHT their STARR structure & clarity and must be given in the following format: "<positive sentence between 50 and 125 characters describing ONE STARR structure/clarity strength>;<sentence between 50 and 125 characters describing ONE STARR structure/clarity weakness, no linking words to the strength>;<a number between 0 & 100 scoring STARR structure/clarity, no words/explanation>"`
   );
   prompt.push(`The question is: ${question} This is the response: ${response}`);
   return prompt;
@@ -48,7 +47,7 @@ const generateInsightsPrompt = (response, question, topics) => {
   prompt.push(
     `You are an interviewer assessing a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
       ", "
-    )}. Your response MUST HIGHLIGHT the quality & depth of insights and must be given in the following format: "<sentence between 50 and 125 characters describing ONE insight quality/depth strength>;<sentence between 50 and 125 characters describing ONE insight quality/depth weakness>;<a number between 0 & 100 scoring insight quality/depth, no words/explanation>"`
+    )}. Your response MUST HIGHLIGHT the quality & depth of insights and must be given in the following format: "<positive sentence between 50 and 125 characters describing ONE insight quality/depth strength>;<sentence between 50 and 125 characters describing ONE insight quality/depth weakness, no linking words to the strength>;<a number between 0 & 100 scoring insight quality/depth, no words/explanation>"`
   );
   prompt.push(`The question is: ${question} This is the response: ${response}`);
   return prompt;
@@ -59,7 +58,7 @@ const generateVocabPrompt = (response, question, topics) => {
   prompt.push(
     `You are an interviewer assessing a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
       ", "
-    )}. Your response MUST HIGHLIGHT the vocabulary & filler words used and must be given in the following format: "<sentence between 50 and 125 characters describing ONE vocab/filler words strength>;<sentence between 50 and 125 characters describing ONE vocab/filler words weakness>;<a number between 0 & 100 scoring vocab/filler words, no words/explanation>"`
+    )}. Your response MUST HIGHLIGHT the vocabulary & filler words used and must be given in the following format: "<positive sentence between 50 and 125 characters describing ONE vocab/filler words strength>;<sentence between 50 and 125 characters describing ONE vocab/filler words weakness, no linking words to the strength>;<a number between 0 & 100 scoring vocab/filler words, no words/explanation>"`
   );
   prompt.push(`The question is: ${question} This is the response: ${response}`);
   return prompt;
@@ -463,4 +462,4 @@ server.use((err, req, res, next) => {
   res.status(status).json({ message });
 });
 
-export default server;
+module.exports = server;

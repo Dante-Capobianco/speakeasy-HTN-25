@@ -1,4 +1,5 @@
-const { PrismaClient } = require("@prisma/client");
+// user-model.js
+import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 module.exports = {

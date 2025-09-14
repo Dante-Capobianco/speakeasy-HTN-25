@@ -1,5 +1,5 @@
 import "./App.css";
-import { processVideo } from "./utils/helperFunctions";
+import { generateQuestions, processVideo } from "./utils/helperFunctions";
 import { getUser, addUser } from "./utils/helperFunctions";
 
 function App() {
@@ -11,13 +11,13 @@ function App() {
         across entire website; app.css for page-specific styling
       </div>
       <button onClick={() => getUser(1)}>get User</button>
-      <button onClick={() => addUser(["Communication, Leadership"])}>Add User</button>
-      <button onClick={() => console.log(generateQuestions(2, ["Communication, Leadership"]))}>Generate Q's</button>
+      <button onClick={() => addUser(["Communication", "Leadership"])}>Add User</button>
+      <button onClick={async () => console.log(await generateQuestions(3, ["Communication", "Leadership"]))}>Generate Q's</button>
       <input
         type="file"
         id="practice-video"
         accept="video/*"
-        onChange={(e) => processVideo(e.target, "Tell me a bit about yourself?", 1, ["Work Ethic, Leadership"])}
+        onChange={(e) => processVideo(e.target, "Tell me a bit about yourself?", 1, ["Work Ethic", "Leadership"])}
       />
     </>
   );

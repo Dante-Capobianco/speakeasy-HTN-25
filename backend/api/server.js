@@ -5,7 +5,7 @@ const cors = require("cors");
 const User = require("./user-model");
 const { PassThrough } = require("stream");
 const { analyzeVerbal } = require("./services/verbal_aa");
-const { verbalPrompt } = require("./services/promptVerbal");
+const { verbalPrompt, questionPrompt } = require("./services/promptVerbal");
 const { negativeFeedbackKeywords } = require("../constants");
 
 const server = express();
@@ -75,6 +75,16 @@ const containsNegativeFeedback = (sentence) => {
     lowerSentence.includes(keyword)
   );
 };
+
+const validateAndCleanseQuestions = (response, numberOfQuestions) => {
+  const questions = response.split(";");
+
+  if (questions.length !== numberOfQuestions || questions.some(q => q.trim().slice(-1) !== "?")) return null;
+
+  const cleanedQuestions = questions.map(q => q.trim());
+
+  return cleanedQuestions;
+}
 
 const validateAndCleanseResponse = (response) => {
   const clean = response.split(";");
@@ -162,6 +172,23 @@ server.get(Path.GET_USER, async (req, res, next) => {
 server.post(Path.ADD_USER, async (req, res, next) => {
   const userId = await User.addUser(req?.body?.topics);
   res.status(200).json({ userId });
+});
+
+server.post(Path.GET_QUESTIONS, async (req, res, next) => {
+  let questions = null;
+  let clean;
+
+  try {
+    while (!questions) {
+      const questionsResponse = await questionPrompt(req?.body?.prompt);
+      clean = validateAndCleanseQuestions(questionsResponse, req?.body?.numberOfQuestions);
+      if (clean) questions = clean;
+    }
+  } catch (err) {
+    next(err);
+  }
+
+  res.status(200).json({ questions });
 });
 
 server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {

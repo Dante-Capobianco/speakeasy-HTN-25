@@ -16,8 +16,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
-export const generateQuestions = (numberOfQuestions, topics) => {
+export const generateQuestions = async (numberOfQuestions, topics) => {
   let questions = [];
+  let prompt = `You are an interviewer for a behavioural interview. You will create ${numberOfQuestions} unique questions that are 1 sentence long AND separated by semi-colons AND with no links between questions AND ending with "?", each of which cover specific topics.`;
 
   switch (topics.length) {
     case 1:
@@ -35,19 +36,37 @@ export const generateQuestions = (numberOfQuestions, topics) => {
       let len = topics.length;
       for (let i = numberOfQuestions; i > 0; i--) {
         const size = Math.ceil(len / i);
-        result.push(arr.slice(start, start + size));
+        questions.push(topics.slice(start, start + size));
         start += size;
         len -= size;
       }
-      return result;
-      const chunkSize = Math.ceil(topics.length / numberOfQuestions); // ensures roughly equal parts
-
-      for (let i = 0; i < len; i += chunkSize) {
-        questions.push(arr.slice(i, i + chunkSize));
-      }
+      break;
   }
+  questions.forEach((questionTopics, idx) => {
+    prompt += ` Question ${idx + 1} must assess the following topic(s): ${questionTopics.join(", ")}.`;
+  });
 
-  return questions;
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_BASE_URL}${Path.GET_QUESTIONS}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt, numberOfQuestions }),
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.questions;
+    } else {
+      return null;
+    }
+  } catch (error) {
+    return null;
+  }
 };
 
 export const processVideo = async (

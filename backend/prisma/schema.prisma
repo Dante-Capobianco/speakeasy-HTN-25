@@ -22,8 +22,10 @@ model PracticeRun {
     totalScore Int
     verbalScore Int
     nonVerbalScore Int
-    positiveFeedback String[]
-    negativeFeedback String[]
+    posVerbalFeedback String[]
+    negVerbalFeedback String[]
+    posNonverbalFeedback String[]
+    negNonverbalFeedback String[]
     user User @relation(fields: [userId], references: [id])
     userId Int
     videos String[]

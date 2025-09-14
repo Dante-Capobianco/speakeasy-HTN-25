@@ -8,8 +8,7 @@ lerna-debug.log*
 
 # Files
 backend/api/services/frames_tmp/
-backend/.venv311
-backend/fastapi
+backend/.venv
 **.ipynb
 **.task
 **.pyc

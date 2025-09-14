@@ -5,6 +5,7 @@ const cors = require("cors");
 const User = require("./user-model");
 const { PassThrough } = require("stream");
 const { analyzeVerbal } = require("./services/verbal_aa");
+const { verbalPrompt } = require("./services/promptVerbal");
 
 const server = express();
 server.use(helmet());
@@ -17,9 +18,71 @@ server.options("/", cors(corsOptions));
 
 // Prompts
 const generateRelevancePrompt = (response, question, topics) => {
-  return `You are an interviewer assessing a candidate's response based on its relevance to a behavioural interview question highlighting the following topics: ${topics.join(
-    ", "
-  )}. The question is: ${question} This is the response: ${response} Given this, provide feedback in the following format: <1 sentence describing relevance strength>;<1 sentence describing relevance weakness>;<relevance score 0 to 100>`;
+  let prompt = [];
+  prompt.push(
+    `You are an interviewer assessing a candidate's response based on its relevance to a behavioural interview question highlighting the following topics: ${topics.join(
+      ", "
+    )}. Your response must be in the following format: "<sentence under 100 characters describing ONE relevance strength>;<sentence under 100 characters describing ONE relevance weakness>;<a number between 0 & 100 scoring relevance, no words/explanation>"`
+  );
+  prompt.push(`The question is: ${question} This is the response: ${response}`);
+  return prompt;
+};
+
+const generateStructureClarityPrompt = (response, question, topics) => {
+  let prompt = [];
+  prompt.push(
+    `You are an interviewer assessing the STARR structure & clarity of a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
+      ", "
+    )}. Your response must be in the following format: "<sentence under 100 characters describing ONE STARR structure/clarity strength>;<sentence under 100 characters describing ONE STARR structure/clarity weakness>;<a number between 0 & 100 scoring STARR structure/clarity, no words/explanation>"`
+  );
+  prompt.push(`The question is: ${question} This is the response: ${response}`);
+  return prompt;
+};
+
+const generateInsightsPrompt = (response, question, topics) => {
+  let prompt = [];
+  prompt.push(
+    `You are an interviewer assessing the quality & depth of insights from a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
+      ", "
+    )}. Your response must be in the following format: "<sentence under 100 characters describing ONE insight quality/depth strength>;<sentence under 100 characters describing ONE insight quality/depth weakness>;<a number between 0 & 100 scoring insight quality/depth, no words/explanation>"`
+  );
+  prompt.push(`The question is: ${question} This is the response: ${response}`);
+  return prompt;
+};
+
+const validateAndCleanseResponse = (response) => {
+  const clean = response.split(";");
+  const positivePeriods = clean[0].match(/\./g);
+  const negativePeriods = clean[0].match(/\./g);
+
+  if (
+    clean.length - 1 !== 2 ||
+    !clean[2].trim().match(/^(100|[1-9]?\d)$/) ||
+    (positivePeriods && positivePeriods.length > 1) ||
+    (negativePeriods && negativePeriods.length > 1)
+  ) {
+    return null;
+  }
+
+  let positiveFeedback = clean[0].replace(/^\s+|\s+$|\s+(?=\s)/g, "").trim();
+  let negativeFeedback = clean[1].replace(/^\s+|\s+$|\s+(?=\s)/g, "").trim();
+  positiveFeedback = positiveFeedback.replace(/\.$/, "");
+  positiveFeedback =
+    positiveFeedback.charAt(0).toUpperCase() +
+    positiveFeedback.slice(1).toLowerCase();
+  negativeFeedback = negativeFeedback.replace(/\.$/, "");
+  negativeFeedback =
+    negativeFeedback.charAt(0).toUpperCase() +
+    negativeFeedback.slice(1).toLowerCase();
+
+  if (positiveFeedback.length >= 100 || negativeFeedback.length >= 100)
+    return null;
+
+  return {
+    positive: positiveFeedback,
+    negative: negativeFeedback,
+    score: clean[2].trim(),
+  };
 };
 
 const cleanseText = (text) => {
@@ -69,6 +132,13 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     return;
   }
 
+  const verbalScore = 0;
+  const posVerbalFeedback = [];
+  const negVerbalFeedback = [];
+  const posNonverbalFeedback = [];
+  const negNonverbalFeedback = [];
+  const nonverbalScore = 0;
+
   // Convert response to a stream
   // const buffer = await videoFile.arrayBuffer();
   // const stream = new PassThrough();
@@ -95,11 +165,68 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
       req?.body?.topics
     );
 
+    const structureClarityPrompt = generateStructureClarityPrompt(
+      noFillersText,
+      req?.body?.question,
+      req?.body?.topics
+    );
+
+    const insightsPrompt = generateInsightsPrompt(
+      noFillersText,
+      req?.body?.question,
+      req?.body?.topics
+    );
+
+    let relevanceResponse = null;
+    let structureClarityResponse = null;
+    let insightsResponse = null;
+
+    while (
+      !relevanceResponse ||
+      !structureClarityResponse ||
+      !insightsResponse
+    ) {
+      let clean;
+
+      if (!relevanceResponse) {
+        const newRelevanceResponse = await verbalPrompt(relevancePrompt);
+        clean = validateAndCleanseResponse(newRelevanceResponse);
+        if (clean) relevanceResponse = clean;
+      }
+
+      if (!structureClarityResponse) {
+        const newStructureClarityResponse = await verbalPrompt(
+          structureClarityPrompt
+        );
+        clean = validateAndCleanseResponse(newStructureClarityResponse);
+        if (clean) structureClarityResponse = clean;
+      }
+
+      if (!insightsResponse) {
+        const newInsightsResponse = await verbalPrompt(insightsPrompt);
+        clean = validateAndCleanseResponse(newInsightsResponse);
+        if (clean) insightsResponse = clean;
+      }
+    }
+
     // Make sure to do validation to ensure proper format, otherwise tell it to redo
   } catch (error) {
     next(error);
     return;
   }
+
+  verbalScore += (relevanceResponse.score + structureClarityResponse.score + insightsResponse.score)
+  verbalScore /= 3;
+  posVerbalFeedback.push(relevanceResponse.positive);
+  posVerbalFeedback.push(structureClarityResponse.positive);
+  posVerbalFeedback.push(insightsResponse.positive);
+
+  negVerbalFeedback.push(relevanceResponse.negative);
+  negVerbalFeedback.push(structureClarityResponse.negative);
+  negVerbalFeedback.push(insightsResponse.negative);
+
+  //TODO: add vocab richness, filler words, and repetition (ingoring stopwords)
+  
 
   // NON-VERBAL ANALYSIS
   const nonverbalResponse = await fetch(`http://127.0.0.1:8000/`, {

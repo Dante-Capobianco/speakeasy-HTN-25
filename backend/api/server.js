@@ -203,7 +203,7 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
   let negVerbalFeedback = [];
   let posNonverbalFeedback = [];
   let negNonverbalFeedback = [];
-  let nonverbalScore = 0;
+  let nonVerbalScore = 0;
   let totalScore;
   let verbalScores = {};
   let nonVerbalScores = {};
@@ -350,10 +350,50 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ videoUrl: req?.body?.videoUrl }),
+    body: JSON.stringify({ 
+      videoUrl: req?.body?.videoUrl,
+      sampleEveryNFrames: 5,
+      maxFrames: 720,
+      modules: ["face", "pose", "gesture"],
+     }),
   });
+  if (!nonverbalResponse.ok) {
+    next({ status: 502, message: "Nonverbal service error" });
+    return;
+  }
+  const nonverbalData = await nonverbalResponse.json();
+  /**
+   fast api return example:
+   {
+      "sub_scores": {
+        "facial_expression_score": 57,
+        "eye_movements_score": 95,
+        "pausing_score": 51,
+        "posture_score": 84,
+        "spatial_distribution_score": 80,
+        "hand_gesture_score": 95
+      },
+      "descriptions": {
+        "positive": [
+          "Hands are visible and support communication.",
+          "No signs of excessive blinking.",
+          "Clean delivery without self-soothing cues."
+        ],
+        "negative": [
+          "Gestures feel sparse or restless at times.",
+          "Shoulder tilt reduces presence.",
+          "Facial affect feels restrained."
+        ]
+      },
+      "overall_score": 77
+    }
+   */
+  nonVerbalScore = nonverbalData.overall_score;
+  nonVerbalScores = nonverbalData.sub_scores;
+  posNonverbalFeedback = nonverbalData.descriptions.positive;
+  negNonverbalFeedback = nonverbalData.descriptions.negative;
 
-  totalScore = (verbalScore + nonverbalScore) / 2;
+  totalScore = (verbalScore + nonVerbalScore) / 2;
 
   await User.storePracticeVideoResults(
     parseInt(req?.body?.practiceRunId),
@@ -366,7 +406,7 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     nonVerbalScores,
     verbalScores,
     verbalScore,
-    nonverbalScore,
+    nonVerbalScore,
     totalScore
   );
 

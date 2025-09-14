@@ -35,9 +35,11 @@ function App() {
   const [stream, setStream] = useState(null);
   const [cameraError, setCameraError] = useState(null);
 
-  // Backend states
+  // --- Integration states ---
   const [userId, setUserId] = useState(null);
   const [user, setUser] = useState(null);
+  const [currPracRunId, setCurrPracRunId] = useState(null);
+  const [questions, setQuestions] = useState(null);
 
   const videoRef = useRef(null);
   const recordedVideoRef = useRef(null);
@@ -260,7 +262,7 @@ function App() {
     const numQ = parseInt(questionQty, 10) || 1;
 
     try {
-      const questions = await generateQuestions(numQ, practiceTopics)
+      const questions = await generateQuestions(numQ, practiceTopics);
 
       const response = await fetch(
         `${import.meta.env.VITE_BASE_URL}${
@@ -271,30 +273,33 @@ function App() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ practiceTopics, questions }),
+          body: JSON.stringify({
+            practiceTopics,
+            questions,
+            prepTime,
+            answerTime,
+          }),
         }
       );
 
       if (response.ok) {
-        const userObject = await response.json();
-        return userObject.user;
-      } else {
-        return null;
+        const data = await response.json();
+        setCurrPracRunId(data.id);
+        console.log(data.id, userId, questions)
+        setQuestions(questions)
+        
+        setTotalQuestions(numQ);
+        setCurrentQuestion(1);
+
+        // Reset recording-related state
+        setRecordedBlob(null);
+        setIsAnswering(false);
+        setIsRecording(false);
+        setAnswerTimeLeft(0);
+
+        setPage("prepare");
       }
-    } catch (error) {
-      return null;
-    }
-
-    setTotalQuestions(numQ);
-    setCurrentQuestion(1);
-
-    // Reset recording-related state
-    setRecordedBlob(null);
-    setIsAnswering(false);
-    setIsRecording(false);
-    setAnswerTimeLeft(0);
-
-    setPage("prepare");
+    } catch (error) {}
   };
 
   const formatTime = (seconds) => {

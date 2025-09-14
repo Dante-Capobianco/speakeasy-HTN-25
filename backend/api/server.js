@@ -180,11 +180,11 @@ server.post(Path.ADD_USER, async (req, res, next) => {
 
 server.post(Path.CREATE_PRACTICE_RUN, async (req, res, next) => {
   const id = await User.createPracticeRun(
-    req?.query?.id,
+    parseInt(req?.query?.id),
     req?.body?.practiceTopics,
     req?.body?.questions,
-    45,
-    75
+    req?.body?.prepTime,
+    req?.body?.answerTime
   );
   res.status(200).json({ id });
 });

@@ -17,8 +17,8 @@ model PracticeRun {
     id Int @id @default(autoincrement())
     topics String[]
     questions String[]
-    timeToReadQuestion Int
-    timeToAnswerQuestion Int
+    timeToReadQuestion String
+    timeToAnswerQuestion String
     totalScore Int[]
 
     verbalScore Int[]

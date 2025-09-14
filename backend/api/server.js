@@ -51,6 +51,17 @@ const generateInsightsPrompt = (response, question, topics) => {
   return prompt;
 };
 
+const generateVocabPrompt = (response, question, topics) => {
+  let prompt = [];
+  prompt.push(
+    `You are an interviewer assessing a candidate's response to a behavioural interview question covering the following topics: ${topics.join(
+      ", "
+    )}. Your response MUST HIGHLIGHT the vocabulary & filler words used and must be given in the following format: "<sentence between 50 and 125 characters describing ONE vocab/filler words strength>;<sentence between 50 and 125 characters describing ONE vocab/filler words weakness>;<a number between 0 & 100 scoring vocab/filler words, no words/explanation>"`
+  );
+  prompt.push(`The question is: ${question} This is the response: ${response}`);
+  return prompt;
+};
+
 const isLengthBetween50And125 = (text) => {
   const len = text.length;
   return len >= 50 && len <= 125;
@@ -133,6 +144,16 @@ const removeFillerWords = (text) => {
   return cleaned;
 };
 
+const computeFillerScore = (fillerCount, totalWords) => {
+  const fillerRatio = fillerCount / totalWords;
+  const minScore = 30;
+  const maxScore = 100;
+  const k = 10;
+
+  const score = minScore + (maxScore - minScore) * Math.exp(-k * fillerRatio);
+  return Math.round(score * 10) / 10; // 1 decimal
+};
+
 server.get(Path.GET_USER, async (req, res, next) => {
   const user = await User.findUserById(parseInt(req?.query?.id));
   res.status(200).json({ user });
@@ -156,10 +177,14 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
   let posNonverbalFeedback = [];
   let negNonverbalFeedback = [];
   let nonverbalScore = 0;
+  let totalScore;
+  let verbalScores = {};
+  let nonVerbalScores = {};
 
   let relevanceResponse = null;
   let structureClarityResponse = null;
   let insightsResponse = null;
+  let vocabResponse = null;
   let cleansedText = null;
 
   // Convert response to a stream
@@ -200,10 +225,17 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
       req?.body?.topics
     );
 
+    const vocabPrompt = generateVocabPrompt(
+      cleansedText,
+      req?.body?.question,
+      req?.body?.topics
+    );
+
     while (
       !relevanceResponse ||
       !structureClarityResponse ||
-      !insightsResponse
+      !insightsResponse ||
+      !vocabResponse
     ) {
       let clean;
 
@@ -226,6 +258,12 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
         clean = validateAndCleanseResponse(newInsightsResponse);
         if (clean) insightsResponse = clean;
       }
+
+      if (!vocabResponse) {
+        const newVocabResponse = await verbalPrompt(vocabPrompt);
+        clean = validateAndCleanseResponse(newVocabResponse);
+        if (clean) vocabResponse = clean;
+      }
     }
 
     // Make sure to do validation to ensure proper format, otherwise tell it to redo
@@ -234,22 +272,6 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     return;
   }
 
-  verbalScore +=
-    parseInt(relevanceResponse.score) +
-    parseInt(structureClarityResponse.score) +
-    parseInt(insightsResponse.score);
-  verbalScore /= 3;
-  verbalScore = verbalScore.toFixed(1);
-
-  posVerbalFeedback.push(relevanceResponse.positive);
-  posVerbalFeedback.push(structureClarityResponse.positive);
-  posVerbalFeedback.push(insightsResponse.positive);
-
-  negVerbalFeedback.push(relevanceResponse.negative);
-  negVerbalFeedback.push(structureClarityResponse.negative);
-  negVerbalFeedback.push(insightsResponse.negative);
-
-  //TODO: add vocab richness, filler words, and repetition (ingoring stopwords)
   const vocabAndFillersResponse = await fetch(
     `http://127.0.0.1:8000/vocab-fillers`,
     {
@@ -261,9 +283,39 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     }
   );
 
+  let vocabScore, fillerWordScore;
+
   if (vocabAndFillersResponse.ok) {
     const verbalAnalysis = await vocabAndFillersResponse.json();
+    vocabScore = verbalAnalysis[0];
+    fillerWordScore = computeFillerScore(verbalAnalysis[1], verbalAnalysis[2]);
+  } else {
+    next({ status: 404, message: "Something went wrong" });
   }
+
+  verbalScore +=
+    parseInt(relevanceResponse.score) +
+    parseInt(structureClarityResponse.score) +
+    parseInt(insightsResponse.score) +
+    vocabScore +
+    fillerWordScore;
+  verbalScore /= 5;
+  verbalScore = verbalScore.toFixed(1);
+  verbalScores.relevanceScore = relevanceResponse.score;
+  verbalScores.structureClarityScore = structureClarityResponse.score;
+  verbalScores.insightsScore = insightsResponse.score;
+  verbalScores.vocabScore = vocabScore;
+  verbalScores.fillerWordScore = fillerWordScore;
+
+  posVerbalFeedback.push(relevanceResponse.positive);
+  posVerbalFeedback.push(structureClarityResponse.positive);
+  posVerbalFeedback.push(insightsResponse.positive);
+  posVerbalFeedback.push(vocabResponse.positive);
+
+  negVerbalFeedback.push(relevanceResponse.negative);
+  negVerbalFeedback.push(structureClarityResponse.negative);
+  negVerbalFeedback.push(insightsResponse.negative);
+  negVerbalFeedback.push(vocabResponse.negative);
 
   // NON-VERBAL ANALYSIS
   const nonverbalResponse = await fetch(`http://127.0.0.1:8000/`, {
@@ -274,8 +326,24 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     body: JSON.stringify({ videoUrl: req?.body?.videoUrl }),
   });
 
-  const analysis = null; // await User.addVideoAnalysis(null, parseInt(req?.query?.id));
-  res.status(200).json({ analysis });
+  totalScore = (verbalScore + nonverbalScore) / 2;
+
+  await User.storePracticeVideoResults(
+    parseInt(req?.body?.practiceRunId),
+    posVerbalFeedback,
+    negVerbalFeedback,
+    posNonverbalFeedback,
+    negNonverbalFeedback,
+    req?.body?.videoUrl,
+    parseInt(req?.query?.userId),
+    nonVerbalScores,
+    verbalScores,
+    verbalScore,
+    nonverbalScore,
+    totalScore
+  );
+
+  res.status(200).end();
 });
 
 server.use("/", async (req, res, next) => {

@@ -973,8 +973,25 @@ async def analyze_nonverbal(req: VerbalRequest):
     # Token-level analysis
     words = [token.text.lower() for token in doc if token.is_alpha]  # Only words
     unique_words = set(words)
-    vocab_richness = len(unique_words) / len(words)  # Higher = more diverse vocabulary
+    vocab_richness = round(len(unique_words) / len(words) * 100, 1)  # Higher = more diverse vocabulary
 
-    print("Vocabulary richness:", round(vocab_richness, 2))
+    word_counts = Counter(words)
+    filler_words = [
+        "um",
+        "uh",
+        "like",
+        "and yeah",
+        "so yeah",
+        "you know",
+        "so",
+        "actually",
+        "basically",
+        "right",
+        "i mean",
+        "okay",
+        "well",
+        "yeah",
+    ]
+    filler_count = sum(word_counts[word] for word in filler_words if word in word_counts)
 
-    return req.cleansedText
+    return [vocab_richness, filler_count, len(words)]

@@ -12,6 +12,7 @@ function App() {
       </div>
       <button onClick={() => getUser(1)}>get User</button>
       <button onClick={() => addUser(["Communication, Leadership"])}>Add User</button>
+      <button onClick={() => console.log(generateQuestions(2, ["Communication, Leadership"]))}>Generate Q's</button>
       <input
         type="file"
         id="practice-video"

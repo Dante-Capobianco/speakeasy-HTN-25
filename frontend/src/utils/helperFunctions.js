@@ -16,7 +16,47 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const storage = getStorage(app);
 
-export const processVideo = async (videoObject, question, userId, topics) => {
+export const generateQuestions = (numberOfQuestions, topics) => {
+  let questions = [];
+
+  switch (topics.length) {
+    case 1:
+      for (let i = 0; i < numberOfQuestions; i++) {
+        questions.push(topics);
+      }
+      break;
+    case 2:
+      for (let i = 0; i < numberOfQuestions; i++) {
+        questions.push([topics[i % 2]]);
+      }
+      break;
+    default:
+      let start = 0;
+      let len = topics.length;
+      for (let i = numberOfQuestions; i > 0; i--) {
+        const size = Math.ceil(len / i);
+        result.push(arr.slice(start, start + size));
+        start += size;
+        len -= size;
+      }
+      return result;
+      const chunkSize = Math.ceil(topics.length / numberOfQuestions); // ensures roughly equal parts
+
+      for (let i = 0; i < len; i += chunkSize) {
+        questions.push(arr.slice(i, i + chunkSize));
+      }
+  }
+
+  return questions;
+};
+
+export const processVideo = async (
+  videoObject,
+  question,
+  userId,
+  topics,
+  practiceRunId = -1
+) => {
   const videoFile = videoObject.files;
   if (!videoFile || videoFile.length === 0) return;
 
@@ -32,13 +72,25 @@ export const processVideo = async (videoObject, question, userId, topics) => {
 
     if (!videoUrl) return null;
 
-    return await analyzeVideo(videoUrl, question, userId, topics);
+    return await analyzeVideo(
+      videoUrl,
+      question,
+      userId,
+      topics,
+      practiceRunId
+    );
   } catch {
     return null;
   }
 };
 
-const analyzeVideo = async (videoUrl, question, userId, topics) => {
+const analyzeVideo = async (
+  videoUrl,
+  question,
+  userId,
+  topics,
+  practiceRunId
+) => {
   try {
     const response = await fetch(
       `${import.meta.env.VITE_BASE_URL}${Path.ANALYZE_VIDEO}?id=${userId}`,
@@ -47,13 +99,12 @@ const analyzeVideo = async (videoUrl, question, userId, topics) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ videoUrl, question, topics }),
+        body: JSON.stringify({ videoUrl, question, topics, practiceRunId }),
       }
     );
 
     if (response.ok) {
-      const analysisObject = await response.json();
-      return analysisObject.analysis;
+      return true;
     } else {
       return null;
     }

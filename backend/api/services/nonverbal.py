@@ -15,10 +15,15 @@ import spacy
 from collections import Counter
 import nltk
 from nltk.corpus import stopwords
+import random
 nltk.download('stopwords')
 
 app = FastAPI()
-nlp = spacy.load("en_core_web_sm")
+# Safe spaCy model loading (optional)
+try:
+    nlp = spacy.load("en_core_web_sm")
+except Exception:
+    nlp = None
 
 # Hand Landmarker model (download on first use)
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
@@ -706,29 +711,16 @@ class GestureAnalyzer(Analyzer):
             dominant = "left"
         elif self.right_vis_s > self.left_vis_s:
             dominant = "right"
-        # Class frequency feedback: sum counts across classes
-        total_gesture_events = sum(int(v.get("count", 0)) for v in self.class_stats.values())
-        class_level = label_count(total_gesture_events)
+        # Visibility feedback only (remove gesture frequency and dominant-hand feedback)
         visibility_level = label_ratio(hand_visibility["any_ratio"]).replace("very much", "very high").replace("relatively many", "high").replace("medium", "moderate")
         feedback = {
-            "gesture_frequency_feedback": f"Gesture frequency is {class_level}.",
             "hand_visibility_feedback": f"Hands visibility is {visibility_level}.",
-            "dominant_hand_feedback": f"Dominant hand: {dominant}.",
         }
-        # Scores without selfTouch (added later in pipeline)
-        # Gesture frequency: moderate best (triangular)
-        gesture_freq_score = score_triangular(total_gesture_events, low=0, mid=8, high=25)
+        # Scores (keep visibility; selfTouch added later in pipeline)
         # Visibility: more visible hands up to ~0.7 is good
         visibility_score = score_linear(hand_visibility["any_ratio"], lo=0.2, hi=0.7)
-        # Dominant hand score: combine visibility and existence of a dominant side
-        base = 60
-        dom_bonus = 8 if dominant != "none" else 0
-        vis_bonus = int(round(_clamp((hand_visibility["any_ratio"] - 0.2) / 0.5, 0.0, 1.0) * 12))
-        dominant_hand_score = int(_clamp(base + dom_bonus + vis_bonus, 0, 100))
         scores = {
-            "gesture_frequency_score": lift_low_score(gesture_freq_score),
             "hand_visibility_score": lift_low_score(visibility_score),
-            "dominant_hand_score": lift_low_score(dominant_hand_score),
         }
         return {
             "gestureClasses": self.class_stats,
@@ -870,15 +862,270 @@ def run_pipeline(local_video_path: str, sample_n: int, max_frames: Optional[int]
         else:
             summaries["gesture"] = {"selfTouch": self_touch}
 
+    # -------- Aggregate simplified scores and remove original per-module scores --------
+    # New scores to return (only these):
+    # - facial_expression_score (from face.smile_score)
+    # - eye_movements_score (from face.blinking_score)
+    # - pausing_score (inverse of face.speaking_score)
+    # - posture_score (average of pose.stability_score and pose.posture_score)
+    # - hand_gesture_score (average of gesture.hand_visibility_score and gesture.self_touch_score)
+    # - spatial_distribution_score (from pose.space_score)
+    aggregated_scores: Dict[str, int] = {}
+
+    # Helper to safely fetch nested score
+    def _get_score(section: str, key: str) -> Optional[int]:
+        sect = summaries.get(section)
+        if not sect:
+            return None
+        sc = sect.get("scores")
+        if not sc:
+            return None
+        val = sc.get(key)
+        try:
+            return int(val) if val is not None else None
+        except Exception:
+            return None
+
+    # Face-derived scores
+    face_smile = _get_score("face", "smile_score")
+    face_blink = _get_score("face", "blinking_score")
+    face_speaking = _get_score("face", "speaking_score")
+    if face_smile is not None:
+        aggregated_scores["facial_expression_score"] = face_smile
+    if face_blink is not None:
+        aggregated_scores["eye_movements_score"] = face_blink
+    if face_speaking is not None:
+        # Pausing is the inverse of speaking; keep within [0,100] and lift low scores for consistency.
+        inv = max(0, min(100, 100 - face_speaking))
+        aggregated_scores["pausing_score"] = lift_low_score(inv)
+
+    # Pose-derived scores
+    pose_posture = _get_score("pose", "posture_score")
+    pose_stability = _get_score("pose", "stability_score")
+    pose_space = _get_score("pose", "space_score")
+    if pose_posture is not None and pose_stability is not None:
+        aggregated_scores["posture_score"] = int(round((pose_posture + pose_stability) / 2))
+    if pose_space is not None:
+        aggregated_scores["spatial_distribution_score"] = pose_space
+
+    # Gesture-derived scores
+    gest_vis = _get_score("gesture", "hand_visibility_score")
+    gest_self_touch = _get_score("gesture", "self_touch_score")
+    if gest_vis is not None and gest_self_touch is not None:
+        aggregated_scores["hand_gesture_score"] = int(round((gest_vis + gest_self_touch) / 2))
+
+    # -------- Build data-driven descriptions (positives & negatives) from 9 standards --------
+    # Collect the original nine standards (when available)
+    standard_scores: Dict[str, int] = {}
+    # Face
+    f_smile = _get_score("face", "smile_score")
+    f_speaking = _get_score("face", "speaking_score")
+    f_blink = _get_score("face", "blinking_score")
+    if f_smile is not None:
+        standard_scores["smile"] = f_smile
+    if f_speaking is not None:
+        standard_scores["speaking"] = f_speaking
+    if f_blink is not None:
+        standard_scores["blinking"] = f_blink
+    # Pose
+    p_posture = _get_score("pose", "posture_score")
+    p_stability = _get_score("pose", "stability_score")
+    p_motion = _get_score("pose", "motion_score")
+    p_space = _get_score("pose", "space_score")
+    if p_posture is not None:
+        standard_scores["posture"] = p_posture
+    if p_stability is not None:
+        standard_scores["stability"] = p_stability
+    if p_motion is not None:
+        standard_scores["motion"] = p_motion
+    if p_space is not None:
+        standard_scores["space"] = p_space
+    # Gesture
+    if gest_vis is not None:
+        standard_scores["hand_visibility"] = gest_vis
+    if gest_self_touch is not None:
+        standard_scores["self_touch"] = gest_self_touch
+
+    # Description templates: 4 positives and 4 negatives per standard
+    POS_DESC: Dict[str, List[str]] = {
+        "smile": [
+            "Smiles appear natural and welcoming.",
+            "Friendly facial expression comes through.",
+            "Warmth is conveyed with appropriate smiling.",
+            "Pleasant expression helps build rapport.",
+        ],
+        "speaking": [
+            "Speaking presence feels lively and clear.",
+            "Mouth movement shows confident articulation.",
+            "Vocal delivery maintains steady energy.",
+            "Good verbal flow supports the message.",
+        ],
+        "blinking": [
+            "Blinking rate appears comfortable and natural.",
+            "Eye behavior feels relaxed and steady.",
+            "No signs of excessive blinking.",
+            "Eye movements support an attentive look.",
+        ],
+        "posture": [
+            "Posture meets the standard and is reasonable.",
+            "Shoulders look level; stance appears composed.",
+            "Body alignment looks professional.",
+            "Upright presence supports credibility.",
+        ],
+        "stability": [
+            "Body remains steady without fidgeting.",
+            "Minimal sway keeps attention on the message.",
+            "Grounded stance shows control.",
+            "Stable presence feels confident.",
+        ],
+        "motion": [
+            "Gesture and movement feel purposeful.",
+            "Moderate movement adds energy.",
+            "Dynamic range supports emphasis.",
+            "Expressive motion helps engagement.",
+        ],
+        "space": [
+            "Framing and body space feel balanced.",
+            "Uses space comfortably within the frame.",
+            "Presence fills the frame appropriately.",
+            "Composition supports a professional look.",
+        ],
+        "hand_visibility": [
+            "Hands are visible and support communication.",
+            "Open-hand visibility aids clarity.",
+            "Gestures are easy to see.",
+            "Hand presence reinforces key points.",
+        ],
+        "self_touch": [
+            "Minimal self-touch keeps focus on the message.",
+            "Looks composed with few face touches.",
+            "Clean delivery without self-soothing cues.",
+            "Professional poise with controlled touches.",
+        ],
+    }
+    NEG_DESC: Dict[str, List[str]] = {
+        "smile": [
+            "Expression looks flat; consider a bit more warmth.",
+            "Limited smiling reduces approachability.",
+            "Facial affect feels restrained.",
+            "Add brief, natural smiles to connect.",
+        ],
+        "speaking": [
+            "Long stretches of silence; aim for steadier delivery.",
+            "Mouth activity suggests low projection.",
+            "Speaking presence feels subdued.",
+            "Vocal energy dips; increase engagement.",
+        ],
+        "blinking": [
+            "Blinking is frequent; try relaxing the gaze.",
+            "Eye behavior may distract at times.",
+            "Rapid blinking suggests tension.",
+            "Consider a steadier eye rhythm.",
+        ],
+        "posture": [
+            "Posture tilts at times; aim for a steadier stance.",
+            "Shoulder tilt reduces presence.",
+            "Body alignment looks uneven.",
+            "Straighter posture would read more confident.",
+        ],
+        "stability": [
+            "Noticeable sway or fidgeting draws attention.",
+            "Movement noise competes with content.",
+            "Restlessness reduces clarity.",
+            "Try anchoring and easing micro-movements.",
+        ],
+        "motion": [
+            "Movement intensity varies; consider moderating.",
+            "Gestures feel sparse or restless at times.",
+            "Motion occasionally distracts from the message.",
+            "A steadier movement baseline would help clarity.",
+        ],
+        "space": [
+            "Appears cramped or drifts out of frame.",
+            "Space use feels uneven.",
+            "Presence is either too tight or too loose.",
+            "Recenter and maintain consistent framing.",
+        ],
+        "hand_visibility": [
+            "Hands rarely appear; bring them into frame.",
+            "Low hand visibility reduces expressiveness.",
+            "Hidden hands limit gesture impact.",
+            "Show purposeful hands near mid-frame.",
+        ],
+        "self_touch": [
+            "Frequent self-touch draws attention.",
+            "Face-touch habits can signal tension.",
+            "Self-soothing gestures appear often.",
+            "Reduce face touches to avoid distraction.",
+        ],
+    }
+
+    positive_texts: List[str] = []
+    negative_texts: List[str] = []
+    items = list(standard_scores.items())  # List[(key, score)]
+    if items:
+        # Positives selection
+        high_keys = [k for k, s in items if s > 85]
+        pos_selected: List[str] = []
+        if len(high_keys) >= 3:
+            # Randomly choose 3 from all >85 (not necessarily the top)
+            pos_selected = random.sample(high_keys, 3)
+        else:
+            # Choose highest-scoring two (ordered by score)
+            top_sorted = sorted(items, key=lambda t: t[1], reverse=True)
+            take = min(2, len(top_sorted))
+            pos_selected = [k for k, _ in top_sorted[:take]]
+
+        # Negatives selection (avoid overlapping with positives)
+        low_candidates = [(k, s) for k, s in items if s < 80 and k not in pos_selected]
+        if len(low_candidates) >= 3:
+            neg_pool_keys = [k for k, _ in low_candidates]
+            neg_selected = random.sample(neg_pool_keys, 3)
+        else:
+            # Choose lowest two overall, excluding those already picked as positives
+            bottom_sorted = sorted([(k, s) for k, s in items if k not in pos_selected], key=lambda t: t[1])
+            take = min(2, len(bottom_sorted))
+            neg_selected = [k for k, _ in bottom_sorted[:take]]
+
+        # Map selections to one randomized sentence each
+        for key in pos_selected:
+            opts = POS_DESC.get(key, [])
+            if opts:
+                positive_texts.append(random.choice(opts))
+        for key in neg_selected:
+            opts = NEG_DESC.get(key, [])
+            if opts:
+                negative_texts.append(random.choice(opts))
+
+    # Remove old per-module scores from summaries as requested
+    for key in list(summaries.keys()):
+        if isinstance(summaries.get(key), dict) and "scores" in summaries.get(key, {}):
+            try:
+                del summaries[key]["scores"]
+            except Exception:
+                pass
+
+    # Build minimal return payload
+    expected_keys = [
+        "facial_expression_score",
+        "eye_movements_score",
+        "pausing_score",
+        "posture_score",
+        "spatial_distribution_score",
+        "hand_gesture_score",
+    ]
+    # Ensure all six keys present; default to 0 if not computed (e.g., module not requested)
+    sub_scores = {k: int(aggregated_scores.get(k, 0) or 0) for k in expected_keys}
+    # Overall is the mean of the six sub-scores
+    overall_score = int(round(sum(sub_scores.values()) / len(sub_scores))) if sub_scores else 0
+
     return {
-        "video": {
-            "fps": float(fps),
-            "sample_every_n_frames": sample_n,
-            "frames_sampled": len(frames),
+        "sub_scores": sub_scores,
+        "descriptions": {
+            "positive": positive_texts,
+            "negative": negative_texts,
         },
-        "frames": frames,
-        "summaries": summaries,
-        "unsupported_modules": unsupported
+        "overall_score": overall_score,
     }
 
 
@@ -968,6 +1215,9 @@ class VerbalRequest(BaseModel):
 
 @app.post("/vocab-fillers")
 async def analyze_nonverbal(req: VerbalRequest):
+    if nlp is None:
+        # Fallback: return the text as-is if spaCy model is unavailable
+        return req.cleansedText
     doc = nlp(req.cleansedText)
 
     # Token-level analysis

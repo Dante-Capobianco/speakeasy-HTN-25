@@ -5,7 +5,6 @@
   box-sizing: border-box;
 }
 
-
 body,
 html,
 #root {
@@ -17,12 +16,10 @@ html,
   overflow-x: hidden;
 }
 
-
 #root {
   display: flex;
   flex-direction: column;
 }
-
 
 /* Common page styles */
 .landing-page,
@@ -34,6 +31,7 @@ html,
 .answer-page,
 .completed-page {
   min-height: 100vh;
+  max-height: 100vh;
   width: 100vw;
   background-color: black;
   color: white;
@@ -44,8 +42,14 @@ html,
   padding: 2rem;
   position: relative;
   overflow-x: hidden;
+  overflow-y: auto;   /* enable vertical scroll */
+  padding-top: 10vw;
+
 }
 
+.answer-page {
+  padding-top: 35vw;
+}
 
 .practice-complete-page {
   min-height: 100vh;
@@ -61,7 +65,6 @@ html,
   overflow-y: auto;
 }
 
-
 /* Header */
 .header {
   position: absolute;
@@ -69,7 +72,6 @@ html,
   left: 1rem;
   z-index: 50;
 }
-
 
 .header-button {
   background: none;
@@ -81,11 +83,9 @@ html,
   transition: color 0.3s;
 }
 
-
 .header-button:hover {
-  color: #ffc0cb;
+  color: #fcd694;
 }
-
 
 /* Landing page */
 .landing-title {
@@ -95,26 +95,21 @@ html,
   margin-bottom: 2rem;
 }
 
-
 .cursor {
   animation: blink 1s infinite;
 }
 
-
 @keyframes blink {
-
   0%,
   50% {
     opacity: 1;
   }
-
 
   51%,
   100% {
     opacity: 0;
   }
 }
-
 
 /* Common button styles */
 .continue-button,
@@ -131,18 +126,15 @@ html,
   margin-top: 2rem;
 }
 
-
 .continue-button:hover,
 .get-started-button:hover {
-  border-color: #ffc0cb;
+  border-color: #fcd694;
 }
-
 
 .continue-button.disabled {
   color: #999;
   cursor: not-allowed;
 }
-
 
 /* I'm Ready button styling */
 .ready-button {
@@ -158,11 +150,9 @@ html,
   margin-top: 2rem;
 }
 
-
 .ready-button:hover {
-  border-color: #ffc0cb;
+  border-color: #fcd694;
 }
-
 
 /* Topics page */
 .topics-title,
@@ -173,7 +163,6 @@ html,
   text-align: center;
 }
 
-
 .topics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -181,7 +170,6 @@ html,
   margin-bottom: 4rem;
   max-width: 800px;
 }
-
 
 .topic-button {
   width: 200px;
@@ -200,20 +188,17 @@ html,
   padding: 1rem;
 }
 
-
 .topic-button:hover {
   color: #fcd694;
-  border-color: #ffc0cb;
+  border-color: #fcd694;
   transform: scale(1.1);
   background-color: #2a2626;
 }
-
 
 .topic-button.selected {
   border-color: #fcd694;
   border-width: 4px;
 }
-
 
 /* Summary page - Increased font sizes */
 .steps-grid {
@@ -223,7 +208,6 @@ html,
   margin-bottom: 3rem;
   max-width: 100vw;
 }
-
 
 .step-item {
   text-align: center;
@@ -237,7 +221,6 @@ html,
   color: #fcd694;
 }
 
-
 .step-title {
   font-size: 2rem;
   /* Increased from 1.5rem */
@@ -245,13 +228,11 @@ html,
   margin-bottom: 1rem;
 }
 
-
 .step-desc {
   font-size: 1.3rem;
   /* Increased from 1rem */
   line-height: 1.4;
 }
-
 
 /* Summary page continue button - larger */
 .summary-page .continue-button {
@@ -261,18 +242,24 @@ html,
   /* Increased font size */
 }
 
-
 /* Practice page - Increased font sizes */
 .practice-page {
   justify-content: flex-start;
   padding-top: 6rem;
 }
 
-
 .new-practice-section {
   display: flex;
   align-items: center;
   margin-bottom: 4rem;
+  transition: transform 0.2s ease;
+  cursor: pointer;
+}
+
+.new-practice-section:hover {
+  transform: scale(1.1);
+  color: #fcd694;
+  transition: all 0.2s ease
 }
 
 .past-runs {
@@ -280,7 +267,6 @@ html,
   font-size: 30px;
   text-align: left;
 }
-
 
 .plus-button {
   width: auto;
@@ -297,26 +283,26 @@ html,
   margin-right: 1rem;
 }
 
-
+.new-practice-section:hover .plus-button,
 .plus-button:hover {
-  border-color: #ffc0cb;
+  color: #fcd694;
+  border-color: #fcd694;
+  transition: all 0.2s ease;
 }
-
 
 .new-practice-text {
   font-size: 2.2rem;
   /* Increased from 1.8rem */
 }
 
-
 .past-runs-section {
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: 20px;
   margin-top: 25px;
 }
-
 
 .run-item {
   display: flex;
@@ -329,11 +315,10 @@ html,
   align-items: center;
 }
 
-
 .run-label {
   font-size: 1.5rem;
+  white-space: pre-wrap; 
 }
-
 
 .view-insights-button {
   background-color: white;
@@ -348,11 +333,9 @@ html,
   transition: all 0.3s;
 }
 
-
 .view-insights-button:hover {
-  border-color: #ffc0cb;
+  border-color: #fcd694;
 }
-
 
 /* New practice page */
 .form-section {
@@ -361,18 +344,15 @@ html,
   margin-bottom: 2rem;
 }
 
-
 .section-title {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1rem;
 }
 
-
 .dropdown-container {
   position: relative;
 }
-
 
 .dropdown-button {
   width: 100%;
@@ -388,18 +368,15 @@ html,
   align-items: center;
 }
 
-
 .dropdown-button.disabled {
   background-color: #666;
   color: #999;
   cursor: not-allowed;
 }
 
-
 .dropdown-arrow {
   margin-left: 0.5rem;
 }
-
 
 .dropdown-menu {
   position: absolute;
@@ -413,7 +390,6 @@ html,
   margin-top: 0.5rem;
 }
 
-
 .dropdown-item {
   width: 100%;
   background: none;
@@ -425,11 +401,9 @@ html,
   transition: background-color 0.3s;
 }
 
-
 .dropdown-item:hover {
   background-color: #f0f0f0;
 }
-
 
 .selected-topics {
   display: flex;
@@ -437,7 +411,6 @@ html,
   gap: 0.5rem;
   margin-top: 1rem;
 }
-
 
 .selected-topic {
   background-color: white;
@@ -449,7 +422,6 @@ html,
   gap: 0.5rem;
 }
 
-
 .remove-topic {
   background: none;
   border: none;
@@ -458,18 +430,15 @@ html,
   cursor: pointer;
 }
 
-
 .checkbox-container {
   display: flex;
   align-items: center;
   margin-top: 1rem;
 }
 
-
 .checkbox-label {
   margin-left: 0.5rem;
 }
-
 
 /* Prepare page */
 .question-text {
@@ -479,13 +448,11 @@ html,
   max-width: 600px;
 }
 
-
 .timer-container {
   position: relative;
   width: 200px;
   height: 200px;
 }
-
 
 .timer-svg {
   width: 200px;
@@ -493,13 +460,11 @@ html,
   transform: rotate(-90deg);
 }
 
-
 .timer-bg {
   fill: none;
   stroke: rgba(255, 255, 255, 0.25);
   stroke-width: 8;
 }
-
 
 .timer-progress {
   fill: none;
@@ -510,7 +475,6 @@ html,
   transition: stroke-dashoffset 1s linear;
 }
 
-
 .timer-text {
   position: absolute;
   top: 50%;
@@ -520,12 +484,10 @@ html,
   font-weight: bold;
 }
 
-
 /* Answer page - Fixed video overlay issues */
 .answer-page {
   gap: 2rem;
 }
-
 
 .answer-content {
   display: flex;
@@ -535,11 +497,11 @@ html,
   width: 100%;
 }
 
-
 .video-container {
   position: relative;
   width: 100%;
   max-width: 640px;
+  min-height: 480px;
   height: 480px;
   background-color: #333;
   border-radius: 12px;
@@ -548,11 +510,9 @@ html,
   /* Lower z-index than buttons */
 }
 
-
 .centered-timer {
   margin: 0 auto;
 }
-
 
 .video-preview {
   width: 100%;
@@ -560,13 +520,12 @@ html,
   object-fit: cover;
 }
 
-
 .recorded-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
-
 
 .camera-error {
   display: flex;
@@ -578,7 +537,6 @@ html,
   text-align: center;
   padding: 2rem;
 }
-
 
 .retry-button {
   background-color: white;
@@ -593,11 +551,9 @@ html,
   margin-top: 1rem;
 }
 
-
 .retry-button:hover {
-  border-color: #ffc0cb;
+  border-color: #fcd694;
 }
-
 
 /* Recording controls - Higher z-index to appear above video */
 .recording-controls {
@@ -607,7 +563,6 @@ html,
   /* Higher z-index than video */
   position: relative;
 }
-
 
 .record-button,
 .stop-button {
@@ -625,13 +580,11 @@ html,
   position: relative;
 }
 
-
 .record-button:hover,
 .stop-button:hover {
-  border-color: #ffc0cb;
+  border-color: #fcd694;
   transform: translateY(-2px);
 }
-
 
 .record-button:disabled {
   background-color: #666;
@@ -639,17 +592,14 @@ html,
   cursor: not-allowed;
 }
 
-
 .stop-button {
   background-color: #ff4444;
   color: white;
 }
 
-
 .stop-button:hover {
   background-color: #cc0000;
 }
-
 
 /* Recording status - Higher z-index */
 .recording-status {
@@ -659,7 +609,6 @@ html,
   position: relative;
 }
 
-
 .recording-indicator {
   color: #ff4444;
   font-weight: bold;
@@ -667,35 +616,28 @@ html,
   animation: pulse 1s infinite;
 }
 
-
 .recorded-indicator {
   color: #22c55e;
   font-weight: bold;
   font-size: 1.1rem;
 }
 
-
 @keyframes pulse {
-
-
   0%,
   100% {
     opacity: 1;
   }
-
 
   50% {
     opacity: 0.5;
   }
 }
 
-
 /* Continue button in answer page - Higher z-index */
 .answer-page .continue-button {
   z-index: 10;
   position: relative;
 }
-
 
 /* Completed page */
 .completion-text {
@@ -704,7 +646,6 @@ html,
   margin-bottom: 2rem;
   max-width: 500px;
 }
-
 
 /* Practice Results Page */
 .practice-results-container {
@@ -716,14 +657,12 @@ html,
   align-items: center;
 }
 
-
 .results-title {
   font-size: 2.5rem;
   font-weight: bold;
   margin-bottom: 2rem;
   text-align: center;
 }
-
 
 .practice-summary {
   background-color: #1a1a1a;
@@ -734,18 +673,15 @@ html,
   max-width: 600px;
 }
 
-
 .summary-item {
   font-size: 1.1rem;
   margin-bottom: 1rem;
   line-height: 1.5;
 }
 
-
 .summary-item:last-child {
   margin-bottom: 0;
 }
-
 
 .scores-section {
   display: flex;
@@ -755,7 +691,6 @@ html,
   flex-wrap: wrap;
 }
 
-
 .score-item {
   display: flex;
   flex-direction: column;
@@ -763,12 +698,10 @@ html,
   gap: 1rem;
 }
 
-
 .score-item h3 {
   font-size: 1.3rem;
   font-weight: 600;
 }
-
 
 .overall-score {
   display: flex;
@@ -778,12 +711,10 @@ html,
   margin-bottom: 4rem;
 }
 
-
 .overall-score h3 {
   font-size: 1.5rem;
   font-weight: 600;
 }
-
 
 .circular-progress {
   position: relative;
@@ -813,14 +744,12 @@ html,
   pointer-events: auto;
 }
 
-
 .score-percentage {
   font-size: 1.2rem;
   font-weight: bold;
   color: #22c55e;
   margin-top: 0.5rem;
 }
-
 
 .questions-feedback {
   width: 100%;
@@ -834,7 +763,6 @@ html,
   margin-bottom: 60px;
 }
 
-
 .question-feedback-section {
   background-color: #1a1a1a;
   border-radius: 12px;
@@ -845,13 +773,11 @@ html,
   gap: 2rem;
 }
 
-
 .question-video-container {
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-
 
 .question-video-container h3 {
   font-size: 1.3rem;
@@ -859,12 +785,10 @@ html,
   margin-bottom: 1rem;
 }
 
-
 .video-placeholder {
   width: 100%;
   max-width: 300px;
 }
-
 
 .playback-video {
   width: 100%;
@@ -874,7 +798,6 @@ html,
   background-color: #333;
   object-fit: cover;
 }
-
 
 .mock-video {
   background-color: #333;
@@ -889,11 +812,9 @@ html,
   transition: background-color 0.3s;
 }
 
-
 .mock-video:hover {
   background-color: #444;
 }
-
 
 .play-button {
   font-size: 3rem;
@@ -901,12 +822,10 @@ html,
   margin-bottom: 1rem;
 }
 
-
 .mock-video p {
   color: #ccc;
   font-size: 0.9rem;
 }
-
 
 .feedback-columns {
   display: grid;
@@ -914,13 +833,11 @@ html,
   gap: 2rem;
 }
 
-
 .feedback-column {
   background-color: #2a2a2a;
   border-radius: 8px;
   padding: 1.5rem;
 }
-
 
 .feedback-column h4 {
   font-size: 1.2rem;
@@ -929,30 +846,25 @@ html,
   color: #22c55e;
 }
 
-
 .feedback-category {
   margin-bottom: 2rem;
 }
-
 
 .feedback-category:last-child {
   margin-bottom: 0;
 }
 
-
 .feedback-category h5 {
   font-size: 1rem;
   font-weight: 600;
   margin-bottom: 0.8rem;
-  color: #ffc0cb;
+  color: #fcd694;
 }
-
 
 .feedback-category ul {
   list-style: none;
   padding: 0;
 }
-
 
 .feedback-category li {
   font-size: 0.9rem;
@@ -962,7 +874,6 @@ html,
   position: relative;
 }
 
-
 .feedback-category li:before {
   content: "•";
   color: #22c55e;
@@ -970,7 +881,6 @@ html,
   position: absolute;
   left: 0;
 }
-
 
 .return-home-button {
   background-color: white;
@@ -985,11 +895,9 @@ html,
   margin-top: 3rem;
 }
 
-
 .return-home-button:hover {
-  border-color: #ffc0cb;
+  border-color: #fcd694;
 }
-
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
@@ -997,16 +905,13 @@ html,
     grid-template-columns: 1fr;
   }
 
-
   .feedback-columns {
     grid-template-columns: 1fr;
   }
 
-
   .scores-section {
     gap: 2rem;
   }
-
 
   .practice-results-container {
     padding: 1rem;
@@ -1016,21 +921,17 @@ html,
     font-size: 1.6rem;
   }
 
-
   .step-desc {
     font-size: 1.1rem;
   }
-
 
   .new-practice-text {
     font-size: 1.8rem;
   }
 
-
   .run-label {
     font-size: 1.5rem;
   }
-
 
   .plus-button {
     width: 70px;
@@ -1038,19 +939,16 @@ html,
     font-size: 2rem;
   }
 
-
   /* Mobile adjustments for answer page */
   .answer-content {
     flex-direction: column;
     gap: 1rem;
   }
 
-
   .video-container {
     max-width: 100%;
     height: 300px;
   }
-
 
   .timer-and-controls {
     width: 100%;

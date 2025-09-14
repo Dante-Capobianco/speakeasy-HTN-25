@@ -338,7 +338,7 @@ function App() {
   const handleContinue = async () => {
     try {
       const id = await addUser(selectedTopics);
-      setUserId(10);
+      setUserId(id);
       if (selectedTopics.length >= 1) {
         // Changed from === 3 to >= 1
         setUserTopics(selectedTopics);
@@ -422,8 +422,17 @@ function App() {
 
   // --- Header Component ---
   const Header = () => (
-    <div className="header">
-      <button onClick={() => setPage("practice")} className="header-button">
+    <div className="header" style={{ position: "fixed" }}>
+      <button
+        onClick={() => setPage("practice")}
+        className="header-button"
+        style={{ display: "flex", alignItems: "center" }}
+      >
+        <img
+          src="/image.png" // path relative to the public folder
+          alt="Logo"
+          style={{ marginLeft: "-5px", marginRight: "10px", height: "30px" }} // optional styling
+        />
         SpeakEasy
       </button>
     </div>
@@ -530,25 +539,45 @@ function App() {
       <div className="practice-page">
         <Header />
 
-        <div className="new-practice-section">
-          <button
-            onClick={() => setPage("newPractice")}
-            className="plus-button"
-          >
-            +
-          </button>
+        <div
+          className="new-practice-section"
+          onClick={() => setPage("newPractice")}
+        >
+          <button className="plus-button">+</button>
           <span className="new-practice-text">Start new practice</span>
         </div>
 
-        <div className="barrier" style={{width: "80%", marginTop: "10px"}}></div>
+        <div
+          className="barrier"
+          style={{ width: "80%", marginTop: "10px" }}
+        ></div>
 
         <h3 className="past-runs">Past Practice Runs</h3>
 
         <div className="past-runs-section">
           {user?.practiceRuns?.map((run, idx) => (
             <div key={run.id} className="run-item">
-              <span className="run-label">Practice Run #{idx + 1}</span>
-              <button className="view-insights-button">View Insights</button>
+              <span className="run-label">
+                Practice Run #{idx + 1} ||{" "}
+                <span style={{ fontSize: "18px" }}>
+                  {run.questions.length} Q
+                </span>{" "}
+                ||{" "}
+                <span style={{ fontSize: "18px" }}>
+                  {run.totalScore}% (Verbal: {run.verbalScore}%, Non-Verbal:{" "}
+                  {run.nonVerbalScore}%)
+                </span>{" "}
+              </span>
+              <button
+                className="view-insights-button"
+                onClick={() => {
+                  setPracRun(run);
+                  setCurrPracRunId(idx + 1);
+                  setPage("practiceComplete");
+                }}
+              >
+                View Insights
+              </button>
             </div>
           ))}
         </div>
@@ -785,6 +814,7 @@ function App() {
               <>
                 {!recordedBlob ? (
                   <video
+                    key="live"
                     ref={videoRef}
                     autoPlay
                     muted
@@ -792,6 +822,7 @@ function App() {
                   />
                 ) : (
                   <video
+                    key="playback"
                     ref={recordedVideoRef}
                     src={URL.createObjectURL(recordedBlob)}
                     controls
@@ -803,23 +834,28 @@ function App() {
             )}
           </div>
 
-          {isAnswering && (
-            <div className="timer-container centered-timer">
-              <svg className="timer-svg">
-                <circle className="timer-bg" cx="100" cy="100" r="45" />
-                <circle
-                  className="timer-progress"
-                  cx="100"
-                  cy="100"
-                  r="45"
-                  style={{
-                    strokeDashoffset: 283 - progress,
-                  }}
-                />
-              </svg>
-              <div className="timer-text">{formatTime(answerTimeLeft)}</div>
-            </div>
-          )}
+          <div className="timer-container centered-timer">
+            {isAnswering && (
+              <>
+                <svg className="timer-svg">
+                  <circle className="timer-bg" cx="100" cy="100" r="45" />
+                  <circle
+                    className="timer-progress"
+                    cx="100"
+                    cy="100"
+                    r="45"
+                    style={{
+                      strokeDashoffset: 283 - progress,
+                    }}
+                  />
+                </svg>
+                <div className="timer-text">{formatTime(answerTimeLeft)}</div>
+              </>
+            )}
+            {!isAnswering && !recordedBlob && (
+              <div style={{ height: "200px" }}></div>
+            )}
+          </div>
         </div>
 
         <div className="recording-controls">
@@ -834,6 +870,10 @@ function App() {
               Continue
             </button>
           )}
+
+          {!isRecording && !recordedBlob && (
+            <div style={{ height: "57px" }}></div>
+          )}
         </div>
 
         <div className="recording-status">
@@ -842,6 +882,9 @@ function App() {
           )}
           {recordedBlob && (
             <span className="recorded-indicator">✓ Recording Complete</span>
+          )}
+          {!isRecording && !recordedBlob && (
+            <div style={{ height: "27px" }}></div>
           )}
         </div>
       </div>
@@ -1049,7 +1092,11 @@ function App() {
                     <h3 style={{ textAlign: "center" }}>
                       Question {index + 1}:{" "}
                       <span style={{ fontSize: "15px" }}>
-                        {questions[index].question}
+                        {questions &&
+                        questions.length >= totalQuestions &&
+                        questions[index]?.question
+                          ? questions[index]?.question
+                          : pracRun.questions[index]}
                       </span>
                     </h3>
                     <div className="video-placeholder">

@@ -379,6 +379,7 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     next({ status: 502, message: "Nonverbal service error" });
     return;
   }
+
   const nonverbalData = await nonverbalResponse.json();
   /**
    fast api return example:

@@ -7,6 +7,9 @@ module.exports = {
       where: {
         id: userId,
       },
+      include: {
+        practiceRuns: true,
+      },
     });
   },
 

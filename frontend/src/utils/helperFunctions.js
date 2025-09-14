@@ -62,7 +62,11 @@ export const generateQuestions = async (numberOfQuestions, topics) => {
 
     if (response.ok) {
       const data = await response.json();
-      return data.questions;
+
+      data.questions.forEach((q, idx) => {
+        questions[idx] = {topics: questions[idx], question: q}
+      })
+      return questions;
     } else {
       return null;
     }
@@ -72,20 +76,19 @@ export const generateQuestions = async (numberOfQuestions, topics) => {
 };
 
 export const processVideo = async (
-  videoObject,
+  videoFile,
   question,
   userId,
   topics,
   practiceRunId = -1
 ) => {
-  const videoFile = videoObject.files;
-  if (!videoFile || videoFile.length === 0) return;
+  // const videoFile = videoObject.files;
+  // if (!videoFile || videoFile.length === 0) return;
 
-  const reader = new FileReader();
   try {
-    const storageRef = ref(storage, "videos/" + videoFile[0].name);
+    const storageRef = ref(storage, "videos/" + videoFile.name);
     let videoUrl = null;
-    await uploadBytes(storageRef, videoFile[0]).then(async (snapshot) => {
+    await uploadBytes(storageRef, videoFile).then(async (snapshot) => {
       await getDownloadURL(snapshot.ref).then((downloadURL) => {
         videoUrl = downloadURL;
       });

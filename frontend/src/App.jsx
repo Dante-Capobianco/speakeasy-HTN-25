@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
-import { addUser, generateQuestions, getUser } from "./utils/helperFunctions";
+import {
+  addUser,
+  generateQuestions,
+  getUser,
+  processVideo,
+} from "./utils/helperFunctions";
 import { Path } from "./utils/enums";
 
 function App() {
@@ -40,6 +45,9 @@ function App() {
   const [user, setUser] = useState(null);
   const [currPracRunId, setCurrPracRunId] = useState(null);
   const [questions, setQuestions] = useState(null);
+  const [doneAnalyzing, setDoneAnalyzing] = useState(true);
+  const [doneCollectingData, setDoneCollectingData] = useState(true);
+  const [pracRun, setPracRun] = useState(null);
 
   const videoRef = useRef(null);
   const recordedVideoRef = useRef(null);
@@ -53,13 +61,19 @@ function App() {
     "Project Management",
   ];
 
+  const getUserObj = async () => {
+    const user = await getUser(userId);
+    setUser(user);
+    setDoneCollectingData(true);
+    if (currPracRunId) {
+      setPracRun(
+        user.user.practiceRuns.find((pracRun) => pracRun.id === currPracRunId)
+      );
+    }
+  };
+
   // --- Typing Effect for Landing Page ---
   useEffect(() => {
-    const getUserObj = async () => {
-      const user = await getUser(userId);
-      setUser(user);
-    };
-
     if (page === "landing") {
       let index = 0;
       const interval = setInterval(() => {
@@ -75,6 +89,12 @@ function App() {
       getUserObj();
     }
   }, [page]);
+
+  useEffect(() => {
+    if (doneAnalyzing && currentQuestion >= totalQuestions) {
+      getUserObj();
+    }
+  }, [doneAnalyzing]);
 
   // --- Prep Timer Effect ---
   useEffect(() => {
@@ -193,10 +213,28 @@ function App() {
       };
 
       recorder.onstop = () => {
+        setDoneAnalyzing(false);
+        setDoneCollectingData(false);
+        const processVideoFile = async (file) => {
+          const success = await processVideo(
+            file,
+            questions[currentQuestion - 1].question,
+            userId,
+            questions[currentQuestion - 1].topics,
+            currPracRunId
+          );
+
+          setDoneAnalyzing(success ? true : false);
+        };
+
         const blob = new Blob(chunks, { type: "video/webm" });
+        const file = new File([blob], `recording-${Date.now()}.webm`, {
+          type: "video/webm",
+        });
         setRecordedBlob(blob);
         setIsRecording(false);
         setIsAnswering(false);
+        processVideoFile(file);
       };
 
       // Start recording
@@ -275,7 +313,7 @@ function App() {
           },
           body: JSON.stringify({
             practiceTopics,
-            questions,
+            questions: questions.map((qObj) => qObj.question),
             prepTime,
             answerTime,
           }),
@@ -285,9 +323,8 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         setCurrPracRunId(data.id);
-        console.log(data.id, userId, questions)
-        setQuestions(questions)
-        
+        setQuestions(questions);
+
         setTotalQuestions(numQ);
         setCurrentQuestion(1);
 
@@ -416,12 +453,6 @@ function App() {
   }
 
   if (page === "practice") {
-    const pastRuns = [
-      { id: 1, label: "Practice Run 1" },
-      { id: 2, label: "Practice Run 2" },
-      { id: 3, label: "Practice Run 3" },
-    ];
-
     return (
       <div className="practice-page">
         <Header />
@@ -625,8 +656,7 @@ function App() {
 
         <h2 className="page-title">Prepare: Question {currentQuestion}</h2>
         <h3 className="question-text">
-          Describe a time when you had to work as part of a team to solve a
-          difficult problem.
+          {questions[currentQuestion - 1].question}
         </h3>
 
         <div className="timer-container">
@@ -667,8 +697,7 @@ function App() {
 
         <h2 className="page-title">Answer: Question {currentQuestion}</h2>
         <h3 className="question-text">
-          Describe a time when you had to work as part of a team to solve a
-          difficult problem.
+          {questions[currentQuestion - 1].question}
         </h3>
 
         <div className="video-container">
@@ -756,8 +785,10 @@ function App() {
 
         <h2 className="page-title">Question {currentQuestion} Completed</h2>
         <p className="completion-text">
-          Great job! This video is currently being analyzed. Proceed to the next
-          question when you are ready!
+          Great job! This video is currently being analyzed. Proceed to{" "}
+          {currentQuestion < totalQuestions
+            ? "the next question when you are ready!"
+            : "view your interview insights!"}
         </p>
 
         {currentQuestion < totalQuestions ? (
@@ -785,7 +816,6 @@ function App() {
 
   if (page === "practiceComplete") {
     // Mock data - will be fetched from backend later
-    const practiceRunNumber = 1;
     const nonVerbalScore = 50;
     const verbalScore = 50;
     const overallScore = 50;
@@ -805,6 +835,17 @@ function App() {
           className="circular-progress"
           style={{ width: size, height: size }}
         >
+          {(!doneAnalyzing || !doneCollectingData) && (
+            <div id="page-overlay">
+              <div className="overlay__content">
+                <div className="spinner"></div>
+                <div className="loading-text">
+                  Running models... Finalizing analysis...
+                </div>
+              </div>
+            </div>
+          )}
+
           <svg width={size} height={size}>
             <circle
               cx={size / 2}
@@ -840,21 +881,21 @@ function App() {
         <Header />
 
         <div className="practice-results-container">
-          <h2 className="results-title">Practice Run #{practiceRunNumber}</h2>
+          <h2 className="results-title">Practice Run #{currPracRunId}</h2>
 
           {/* Practice Summary */}
           <div className="practice-summary">
             <div className="summary-item">
-              <strong>Topics:</strong> {practiceTopics.join(", ")}
+              <strong>Topics:</strong> {pracRun ? pracRun.topics.join(", ") : ""}
             </div>
             <div className="summary-item">
-              <strong>Number of Questions:</strong> {totalQuestions}
+              <strong>Number of Questions:</strong> {pracRun ? pracRun.questions.length : ""}
             </div>
             <div className="summary-item">
-              <strong>Prep Time Per Question:</strong> {prepTime}
+              <strong>Prep Time Per Question:</strong> {pracRun ? pracRun.timeToReadQuestion : ""}
             </div>
             <div className="summary-item">
-              <strong>Answer Time Per Question:</strong> {answerTime}
+              <strong>Answer Time Per Question:</strong> {pracRun ? pracRun.timeToAnswerQuestion : ""}
             </div>
           </div>
 
@@ -862,13 +903,13 @@ function App() {
           <div className="scores-section">
             <div className="score-item">
               <h3>Non-Verbal</h3>
-              <CircularProgress percentage={nonVerbalScore} />
-              <div className="score-percentage">{nonVerbalScore}%</div>
+              <CircularProgress percentage={pracRun ? pracRun.nonVerbalScore : 0} />
+              <div className="score-percentage">{pracRun ? pracRun.nonVerbalScore : 0}%</div>
             </div>
             <div className="score-item">
               <h3>Verbal</h3>
-              <CircularProgress percentage={verbalScore} />
-              <div className="score-percentage">{verbalScore}%</div>
+              <CircularProgress percentage={pracRun ? pracRun.verbalScore : 0} />
+              <div className="score-percentage">{pracRun ? pracRun.verbalScore : 0}%</div>
             </div>
           </div>
 

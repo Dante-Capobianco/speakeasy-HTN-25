@@ -75,13 +75,13 @@ module.exports = {
     nonverbalScore,
     totalScore
   ) {
-    const practiceRun = await prisma.practiceRun.update({
+    await prisma.practiceRun.update({
       where: { id: practiceRunId },
-      update: {
-        posVerbalFeedback: { push: posVerbalFeedback },
-        negVerbalFeedback: { push: negVerbalFeedback },
-        posNonverbalFeedback: { push: posNonverbalFeedback },
-        negNonverbalFeedback: { push: negNonverbalFeedback },
+      data: {
+        posVerbalFeedback: { push: JSON.stringify(posVerbalFeedback) },
+        negVerbalFeedback: { push: JSON.stringify(negVerbalFeedback) },
+        posNonverbalFeedback: { push: JSON.stringify(posNonverbalFeedback) },
+        negNonverbalFeedback: { push: JSON.stringify(negNonverbalFeedback) },
         videos: { push: videoUrl },
 
         nonVerbalScore: { push: nonverbalScore },
@@ -108,7 +108,5 @@ module.exports = {
         totalScore: { push: totalScore },
       },
     });
-
-    return practiceRun;
   },
 };

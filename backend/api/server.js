@@ -79,12 +79,16 @@ const containsNegativeFeedback = (sentence) => {
 const validateAndCleanseQuestions = (response, numberOfQuestions) => {
   const questions = response.split(";");
 
-  if (questions.length !== numberOfQuestions || questions.some(q => q.trim().slice(-1) !== "?")) return null;
+  if (
+    questions.length !== numberOfQuestions ||
+    questions.some((q) => q.trim().slice(-1) !== "?")
+  )
+    return null;
 
-  const cleanedQuestions = questions.map(q => q.trim());
+  const cleanedQuestions = questions.map((q) => q.trim());
 
   return cleanedQuestions;
-}
+};
 
 const validateAndCleanseResponse = (response) => {
   const clean = response.split(";");
@@ -181,7 +185,10 @@ server.post(Path.GET_QUESTIONS, async (req, res, next) => {
   try {
     while (!questions) {
       const questionsResponse = await questionPrompt(req?.body?.prompt);
-      clean = validateAndCleanseQuestions(questionsResponse, req?.body?.numberOfQuestions);
+      clean = validateAndCleanseQuestions(
+        questionsResponse,
+        req?.body?.numberOfQuestions
+      );
       if (clean) questions = clean;
     }
   } catch (err) {
@@ -324,13 +331,13 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     parseInt(relevanceResponse.score) +
     parseInt(structureClarityResponse.score) +
     parseInt(insightsResponse.score) +
-    vocabScore +
-    fillerWordScore;
+    parseInt(vocabScore) +
+    parseInt(fillerWordScore);
   verbalScore /= 5;
-  verbalScore = verbalScore.toFixed(1);
-  verbalScores.relevanceScore = relevanceResponse.score;
-  verbalScores.structureClarityScore = structureClarityResponse.score;
-  verbalScores.insightsScore = insightsResponse.score;
+  verbalScore = parseInt(verbalScore.toFixed(1));
+  verbalScores.relevanceScore = parseInt(relevanceResponse.score);
+  verbalScores.structureClarityScore = parseInt(structureClarityResponse.score);
+  verbalScores.insightsScore = parseInt(insightsResponse.score);
   verbalScores.vocabScore = vocabScore;
   verbalScores.fillerWordScore = fillerWordScore;
 
@@ -350,12 +357,12 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ 
+    body: JSON.stringify({
       videoUrl: req?.body?.videoUrl,
       sampleEveryNFrames: 5,
       maxFrames: 720,
       modules: ["face", "pose", "gesture"],
-     }),
+    }),
   });
   if (!nonverbalResponse.ok) {
     next({ status: 502, message: "Nonverbal service error" });
@@ -391,16 +398,16 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
 
   const nv = nonverbalData?.sub_scores ?? {};
   const mapScores = (s) => ({
-    facialExpressionScore: Number(s?.facial_expression_score ?? 0),
-    eyeMovementsScore: Number(s?.eye_movements_score ?? 0),
-    pausingScore: Number(s?.pausing_score ?? 0),
-    postureScore: Number(s?.posture_score ?? 0),
-    spatialDistributionScore: Number(s?.spatial_distribution_score ?? 0),
-    handGesturesScore: Number(s?.hand_gesture_score ?? 0),
+    facialExpressionScore: parseInt(s?.facial_expression_score ?? 0),
+    eyeMovementsScore: parseInt(s?.eye_movements_score ?? 0),
+    pausingScore: parseInt(s?.pausing_score ?? 0),
+    postureScore: parseInt(s?.posture_score ?? 0),
+    spatialDistributionScore: parseInt(s?.spatial_distribution_score ?? 0),
+    handGesturesScore: parseInt(s?.hand_gesture_score ?? 0),
   });
 
   nonVerbalScores = mapScores(nv);
-  nonVerbalScore = Number(nonverbalData?.overall_score ?? 0);
+  nonVerbalScore = parseInt(nonverbalData?.overall_score.toFixed(1) ?? 0);
   posNonverbalFeedback = Array.isArray(nonverbalData?.descriptions?.positive)
     ? nonverbalData.descriptions.positive
     : [];
@@ -412,8 +419,15 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
   // posNonverbalFeedback = nonverbalData.descriptions.positive;
   // negNonverbalFeedback = nonverbalData.descriptions.negative;
 
-
-  totalScore = (verbalScore + nonVerbalScore) / 2;
+  totalScore = parseInt(((verbalScore + nonVerbalScore) / 2).toFixed(1));
+  
+  // const id = await User.createPracticeRun(
+  //   userId,
+  //   ["Comms", "Prob"],
+  //   ["Q1", "Q2"],
+  //   45,
+  //   75
+  // );
 
   await User.storePracticeVideoResults(
     parseInt(req?.body?.practiceRunId),
@@ -422,7 +436,6 @@ server.post(Path.ANALYZE_VIDEO, async (req, res, next) => {
     posNonverbalFeedback,
     negNonverbalFeedback,
     req?.body?.videoUrl,
-    parseInt(req?.query?.userId),
     nonVerbalScores,
     verbalScores,
     verbalScore,

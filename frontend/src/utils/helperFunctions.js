@@ -43,7 +43,9 @@ export const generateQuestions = async (numberOfQuestions, topics) => {
       break;
   }
   questions.forEach((questionTopics, idx) => {
-    prompt += ` Question ${idx + 1} must assess the following topic(s): ${questionTopics.join(", ")}.`;
+    prompt += ` Question ${
+      idx + 1
+    } must assess the following topic(s): ${questionTopics.join(", ")}.`;
   });
 
   try {
